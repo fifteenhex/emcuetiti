@@ -2,6 +2,9 @@
 
 #define LIBMQTT_MINIMUMPACKETBYTES		2 // the minimum packet size is the type/flags byte and a single byte length
 
+#define LIBMQTT_MINIMUMFIXEDHEADERBYTES 2 //
+#define LIBMQTT_MAXIMUMFIXEDHEADERBYTES	5 //
+
 #define LIBMQTT_PACKETYPEANDFLAGS(t, f) ((t << LIBMQTT_PACKETTYPE_SHIFT) | f)
 
 #define LIBMQTT_MQTTSTRLEN(l) (l + 2)

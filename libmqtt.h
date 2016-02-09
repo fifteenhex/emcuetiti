@@ -2,6 +2,11 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
+
+typedef enum {
+	LIBMQTT_QOS0_ATMOSTONCE, LIBMQTT_QOS1_ATLEASTONCE, LIBMQTT_QOS2_EXACTLYONCE
+} libmqtt_qos;
 
 #define LIBMQTT_CLIENTID_MINLEGNTH		1
 #define LIBMQTT_CLIENTID_MAXLENGTH		23
@@ -33,6 +38,9 @@ typedef struct {
 	uint8_t qos;
 } libmqtt_subscription;
 
+int libmqtt_encodelength(uint8_t* buffer, size_t bufferlen, size_t len,
+		size_t* fieldlen);
+
 int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
 		const char* clientid, const char* willtopic, const char* willmessage,
 		const char* username, const char* password);
@@ -41,7 +49,8 @@ int libmqtt_construct_connack(libmqtt_writefunc writefunc, void* userdata);
 
 int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
 		libmqtt_readfunc readfunc, void* readuserdata, const char* topic,
-		size_t payloadlen);
+		size_t payloadlen, libmqtt_qos qos, bool duplicate, bool retain,
+		uint16_t id);
 
 int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 		libmqtt_subscription* subscriptions, int numsubscriptions);

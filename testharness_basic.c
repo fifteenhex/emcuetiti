@@ -117,7 +117,8 @@ int main(int argv, char** argc) {
 			payloadlen, .readpos = 0 };
 
 	libmqtt_construct_publish(packet_writefunc, &ppbh, buffer_readfunc,
-			&payloadbh, "topic", payloadlen);
+			&payloadbh, "topic", payloadlen, LIBMQTT_QOS0_ATMOSTONCE, false,
+			false, 0xaa55);
 
 	testutils_printbuffer(cpbh.buffer, cpbh.writepos);
 	testutils_printbuffer(spbh.buffer, spbh.writepos);
