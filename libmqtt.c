@@ -22,7 +22,38 @@ typedef struct {
 typedef struct {
 	const uint8_t packetidmsb;
 	const uint8_t packetidlsb;
-}__attribute__ ((packed)) libmqtt_subscribe_variableheader;
+}__attribute__ ((packed)) libmqtt_messageid_variableheader;
+
+static void libmqtt_appendlengthandstring(libmqtt_writefunc writefunc,
+		void* userdata, const char* string, size_t len) {
+	uint8_t strlen[2] = { ((len >> 8) & 0xff), (len & 0xff) };
+	writefunc(userdata, strlen, sizeof(strlen));
+	writefunc(userdata, string, len);
+}
+
+static int libmqtt_construct_genericack(libmqtt_writefunc writefunc,
+		void* userdata, uint8_t typeandflags) {
+	libmqtt_messageid_variableheader varheader = {
+
+	};
+
+	uint8_t fixedheader[2];
+	fixedheader[0] = typeandflags;
+	size_t remainingbytesfiedlen;
+	libmqtt_encodelength(fixedheader + 1, sizeof(fixedheader) - 1,
+			sizeof(varheader), &remainingbytesfiedlen);
+
+	writefunc(userdata, fixedheader, 1 + remainingbytesfiedlen);
+	writefunc(userdata, (uint8_t*) &varheader, sizeof(varheader));
+	return 0;
+}
+
+static int libmqtt_construct_fixedheaderonly(libmqtt_writefunc writefunc,
+		void* userdata, uint8_t typeandflags) {
+	uint8_t fixedheader[2] = { typeandflags, 0 };
+	writefunc(userdata, fixedheader, sizeof(fixedheader));
+	return 0;
+}
 
 int libmqtt_encodelength(uint8_t* buffer, size_t bufferlen, size_t len,
 		size_t* fieldlen) {
@@ -55,13 +86,6 @@ int libmqtt_decodelength(uint8_t* buffer, size_t* len) {
 	*len = tmp;
 
 	return 0;
-}
-
-static void libmqtt_appendlengthandstring(libmqtt_writefunc writefunc,
-		void* userdata, const char* string, size_t len) {
-	uint8_t strlen[2] = { ((len >> 8) & 0xff), (len & 0xff) };
-	writefunc(userdata, strlen, sizeof(strlen));
-	writefunc(userdata, string, len);
 }
 
 int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
@@ -166,40 +190,52 @@ int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
 	libmqtt_encodelength(fixedheader + 1, sizeof(fixedheader) - 1,
 	LIBMQTT_MQTTSTRLEN(topiclen) + payloadlen, &remainingbytesfiedlen);
 
-	write(writeuserdata, fixedheader, 1 + remainingbytesfiedlen);
+	writefunc(writeuserdata, fixedheader, 1 + remainingbytesfiedlen);
 	libmqtt_appendlengthandstring(writefunc, writeuserdata, topic, topiclen);
 
 	size_t payloadremaining = payloadlen;
 	uint8_t buffer[32];
 	while (payloadremaining > 0) {
-		int read = readfunc(readuserdata, buffer, sizeof(buffer));
-		writefunc(readuserdata, buffer, sizeof(buffer));
+		int want = sizeof(buffer);
+		if (payloadremaining < want)
+			want = payloadremaining;
+
+		int read = readfunc(readuserdata, buffer, want);
+		writefunc(writeuserdata, buffer, want);
 		payloadremaining -= read;
 	}
 
 	return 0;
 }
 
-int libmqtt_construct_puback(uint8_t* buffer) {
+int libmqtt_construct_puback(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_genericack(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBACK, 0));
 	return 0;
 }
 
-int libmqtt_construct_pubrec(uint8_t* buffer) {
+int libmqtt_construct_pubrec(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_genericack(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBREC, 0));
 	return 0;
 }
 
-int libmqtt_construct_pubrel(uint8_t* buffer) {
+int libmqtt_construct_pubrel(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_genericack(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBREL, 0));
 	return 0;
 }
 
-int libmqtt_construct_pubcomp(uint8_t* buffer) {
+int libmqtt_construct_pubcomp(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_genericack(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBCOMP, 0));
 	return 0;
 }
 
 int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 		libmqtt_subscription* subscriptions, int numsubscriptions) {
 
-	libmqtt_subscribe_variableheader varheader = {
+	libmqtt_messageid_variableheader varheader = {
 
 	};
 
@@ -229,7 +265,7 @@ int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 		uint8_t* returncodes, int numreturncodes) {
 
-	libmqtt_subscribe_variableheader varheader = {
+	libmqtt_messageid_variableheader varheader = {
 
 	};
 
@@ -248,23 +284,55 @@ int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 	return 0;
 }
 
-int libmqtt_construct_unsubscribe(uint8_t* buffer) {
+int libmqtt_construct_unsubscribe(libmqtt_writefunc writefunc, void* userdata,
+		const char** topics, int numtopics) {
+
+	libmqtt_messageid_variableheader varheader = {
+
+	};
+
+	size_t payloadsz = 0;
+	for (int i = 0; i < numtopics; i++)
+		payloadsz += 2 + strlen(topics[i]);
+
+	uint8_t fixedheader[2];
+	fixedheader[0] = LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_SUBSCRIBE, 0);
+
+	size_t remainingbytesfiedlen;
+	libmqtt_encodelength(fixedheader + 1, sizeof(fixedheader) - 1,
+			sizeof(varheader) + payloadsz, &remainingbytesfiedlen);
+
+	writefunc(userdata, fixedheader, 1 + remainingbytesfiedlen);
+	writefunc(userdata, (uint8_t*) &varheader, sizeof(varheader));
+
+	for (int i = 0; i < numtopics; i++)
+		libmqtt_appendlengthandstring(writefunc, userdata, topics[i],
+				strlen(topics[i]));
+
 	return 0;
 }
 
-int libmqtt_construct_unsuback(uint8_t* buffer) {
+int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_genericack(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_UNSUBACK, 0));
 	return 0;
 }
 
-int libmqtt_construct_pingreq(uint8_t* buffer) {
+int libmqtt_construct_pingreq(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_fixedheaderonly(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PINGREQ, 0));
 	return 0;
 }
 
-int libmqtt_construct_pingresp(uint8_t* buffer) {
+int libmqtt_construct_pingresp(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_fixedheaderonly(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PINGRESP, 0));
 	return 0;
 }
 
-int libmqtt_construct_disconnect(uint8_t* buffer) {
+int libmqtt_construct_disconnect(libmqtt_writefunc writefunc, void* userdata) {
+	libmqtt_construct_fixedheaderonly(writefunc, userdata,
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_DISCONNECT, 0));
 	return 0;
 }
 

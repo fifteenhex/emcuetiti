@@ -13,7 +13,7 @@ typedef struct {
 } bufferholder;
 
 typedef enum {
-	CONNECT, SUBSCRIBE, FINISHED
+	CONNECT, SUBSCRIBE, PUBLISH, FINISHED
 } teststate;
 
 static teststate state = CONNECT;
@@ -41,8 +41,10 @@ static int packet_writefunc(void* userdata, const uint8_t* buffer, size_t len) {
 	return len;
 }
 
-static int buffer_readfunc(void* userdata, const uint8_t* buffer, size_t len) {
-	return 0;
+static int buffer_readfunc(void* userdata, uint8_t* buffer, size_t len) {
+	bufferholder* buffholder = (bufferholder*) userdata;
+	memcpy(buffer, buffholder->buffer + buffholder->readpos, len);
+	return len;
 }
 
 static int connection_writefunc(void* userdata, const uint8_t* buffer,
@@ -68,8 +70,11 @@ static int readfunc(void* userdata, uint8_t* buffer, size_t offset, size_t len) 
 			break;
 		case SUBSCRIBE:
 			bh = &spbh;
-			next = FINISHED;
+			next = PUBLISH;
 			break;
+		case PUBLISH:
+			bh = &ppbh;
+			next = FINISHED;
 		}
 
 		size_t available = bh->writepos - bh->readpos;
@@ -96,23 +101,15 @@ static bool readytoread(void* userdata) {
 
 int main(int argv, char** argc) {
 
-	emcuetiti_topichandle root;
-	emcuetiti_topichandle topic;
-
-	emcuetiti_clienthandle client = { .writefunc = connection_writefunc,
-			.readytoread = readytoread, .readfunc = readfunc };
-
-	emcuetiti_init(&root);
-	emcuetiti_addtopicpart(&root, &topic, "topic");
-
-	emcuetiti_client_register(&client);
-
+	printf("creating packets\n");
 	libmqtt_construct_connect(packet_writefunc, &cpbh, "test", NULL, NULL, NULL,
 	NULL);
 
 	libmqtt_subscription subs[] = { { .topic = "topic", .qos = 0 } };
 
 	libmqtt_construct_subscribe(packet_writefunc, &spbh, subs, 1);
+
+	printf("running test\n");
 
 	const char* payload = "thisisapayload";
 	size_t payloadlen = strlen(payload);
@@ -124,6 +121,17 @@ int main(int argv, char** argc) {
 
 	testutils_printbuffer(cpbh.buffer, cpbh.writepos);
 	testutils_printbuffer(spbh.buffer, spbh.writepos);
+
+	emcuetiti_topichandle root;
+	emcuetiti_topichandle topic;
+
+	emcuetiti_clienthandle client = { .writefunc = connection_writefunc,
+			.readytoread = readytoread, .readfunc = readfunc };
+
+	emcuetiti_init(&root);
+	emcuetiti_addtopicpart(&root, &topic, "topic");
+
+	emcuetiti_client_register(&client);
 
 	for (int i = 0; i < 25; i++)
 		emcuetiti_poll();
