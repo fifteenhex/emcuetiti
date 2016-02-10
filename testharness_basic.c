@@ -109,8 +109,6 @@ int main(int argv, char** argc) {
 
 	libmqtt_construct_subscribe(packet_writefunc, &spbh, subs, 1);
 
-	printf("running test\n");
-
 	const char* payload = "thisisapayload";
 	size_t payloadlen = strlen(payload);
 	bufferholder payloadbh = { .buffer = payload, .len = payloadlen, .writepos =
@@ -123,19 +121,24 @@ int main(int argv, char** argc) {
 	testutils_printbuffer(cpbh.buffer, cpbh.writepos);
 	testutils_printbuffer(spbh.buffer, spbh.writepos);
 
-	emcuetiti_topichandle root;
+	printf("setting up broker\n");
+
+	emcuetiti_brokerhandle broker;
 	emcuetiti_topichandle topic;
 
 	emcuetiti_clienthandle client = { .writefunc = connection_writefunc,
 			.readytoread = readytoread, .readfunc = readfunc };
 
-	emcuetiti_init(&root);
-	emcuetiti_addtopicpart(&root, &topic, "topic");
+	emcuetiti_init(&broker);
+	emcuetiti_addtopicpart(&broker, NULL, &topic, "topic");
 
-	emcuetiti_client_register(&client);
+	emcuetiti_client_register(&broker, &client);
 
+	emcuetiti_dumpstate(&broker);
+
+	printf("running test\n");
 	for (int i = 0; i < 25; i++)
-		emcuetiti_poll();
+		emcuetiti_poll(&broker);
 
 	return 0;
 }

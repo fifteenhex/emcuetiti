@@ -182,6 +182,8 @@ int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
 		size_t payloadlen, libmqtt_qos qos, bool duplicate, bool retain,
 		uint16_t id) {
 
+	bool needsid = qos > LIBMQTT_QOS0_ATMOSTONCE;
+
 	size_t topiclen = strlen(topic);
 	libmqtt_messageid_variableheader messageid = { .packetidmsb = (id >> 8)
 			& 0xff, .packetidlsb = id & 0xff };
@@ -190,15 +192,16 @@ int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
 	fixedheader[0] = LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBLISH, 0);
 	size_t remainingbytesfiedlen;
 	libmqtt_encodelength(fixedheader + 1, sizeof(fixedheader) - 1,
-	LIBMQTT_MQTTSTRLEN(topiclen) + sizeof(messageid) + payloadlen,
-			&remainingbytesfiedlen);
+			LIBMQTT_MQTTSTRLEN(topiclen) + (needsid ? sizeof(messageid) : 0)
+					+ payloadlen, &remainingbytesfiedlen);
 
 	// fixed header
 	writefunc(writeuserdata, fixedheader, 1 + remainingbytesfiedlen);
 
 	// var header
 	libmqtt_appendlengthandstring(writefunc, writeuserdata, topic, topiclen);
-	writefunc(writeuserdata, (uint8_t*) &messageid, sizeof(messageid));
+	if (needsid)
+		writefunc(writeuserdata, (uint8_t*) &messageid, sizeof(messageid));
 
 	// payload
 	size_t payloadremaining = payloadlen;
