@@ -31,8 +31,18 @@ typedef enum {
 	CLIENTREADSTATE_TYPE,
 	CLIENTREADSTATE_REMAININGLEN,
 	CLIENTREADSTATE_PAYLOAD,
-	CLIENTREADSTATE_COMPLETE
+	CLIENTREADSTATE_COMPLETE,
+
+	CLIENTREADSTATE_PUBLISHREADY
 } emcuetiti_clientreadstate;
+
+typedef struct emcuetiti_topichandle {
+	const char* topicpart;
+	struct emucutiti_topichandle* child;
+	struct emcuetiti_topichandle* sibling;
+	struct emcuetiti_topichandle* parent;
+	bool targetable;
+} emcuetiti_topichandle;
 
 typedef struct {
 	emcuetiti_clienthandle* client;
@@ -45,20 +55,20 @@ typedef struct {
 
 	emcuetiti_clientreadstate readstate;
 	uint8_t packettype;
+	size_t varheaderandpayloadlen;
 	size_t remainingbytes;
-} emcuetiti_clientstate;
 
-typedef struct emcuetiti_topichandle {
-	const char* topicpart;
-	struct emucutiti_topichandle* child;
-	struct emcuetiti_topichandle* sibling;
-	struct emcuetiti_topichandle* parent;
-} emcuetiti_topichandle;
+	emcuetiti_topichandle* publishtopic;
+	size_t publishpayloadlen;
+} emcuetiti_clientstate;
 
 typedef struct {
 	emcuetiti_clienthandle* client;
 	emcuetiti_topichandle* topic;
 } emcuetiti_subscriptionhandle;
+
+typedef int (*emcuetitit_publishreadyfunc)(emcuetiti_clienthandle* client,
+		size_t payloadlen);
 
 typedef struct {
 	unsigned registeredclients;
@@ -67,10 +77,12 @@ typedef struct {
 	emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
 	emcuetiti_subscriptionhandle subscriptions[EMCUETITI_CONFIG_MAXCLIENTS
 			* EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
+
+	emcuetitit_publishreadyfunc publishreadycallback;
 } emcuetiti_brokerhandle;
 
 typedef struct {
-	emcuetiti_topichandle topic;
+	emcuetiti_topichandle* topic;
 	emcuetiti_writefunc writefunc;
 	emcuetiti_readfunc readfunc;
 	emcuetiti_freefunc freefunc;
@@ -88,11 +100,14 @@ void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle);
 void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle);
+int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
+		emcuetiti_clienthandle* client, uint8_t* buffer, size_t len);
 
 //
 void emcuetiti_poll(emcuetiti_brokerhandle* broker);
 void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
-		const char* topicpart);
-void emcuetiti_init(emcuetiti_brokerhandle* broker);
+		const char* topicpart, bool targetable);
+void emcuetiti_init(emcuetiti_brokerhandle* broker,
+		emcuetitit_publishreadyfunc publishreadycallback);
 void emcuetiti_dumpstate(emcuetiti_brokerhandle* broker);

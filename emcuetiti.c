@@ -52,6 +52,20 @@ void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 	}
 }
 
+int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
+		emcuetiti_clienthandle* client, uint8_t* buffer, size_t len) {
+
+	emcuetiti_clientstate* cs;
+	for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
+		if (broker->clients[i].client == client) {
+			cs = &(broker->clients[i]);
+		}
+	}
+
+	memcpy(buffer, cs->buffer + cs->bufferpos, len);
+	return len;
+}
+
 static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 	uint8_t* offsetbuffer = cs->buffer + cs->bufferpos;
 	void* userdata = cs->client->userdata;
@@ -71,10 +85,11 @@ static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 	case CLIENTREADSTATE_REMAININGLEN:
 		if (cs->client->readfunc(userdata, offsetbuffer, 0, 1) == 1) {
 			if ((*offsetbuffer & (1 << 7)) == 0) {
-				libmqtt_decodelength(cs->buffer, &cs->remainingbytes);
-				if (cs->remainingbytes > 0)
+				libmqtt_decodelength(cs->buffer, &cs->varheaderandpayloadlen);
+				if (cs->varheaderandpayloadlen > 0) {
 					cs->readstate = CLIENTREADSTATE_PAYLOAD;
-				else
+					cs->remainingbytes = cs->varheaderandpayloadlen;
+				} else
 					cs->readstate = CLIENTREADSTATE_COMPLETE;
 			}
 			cs->bufferpos = 0;
@@ -102,8 +117,7 @@ static emcuetiti_topichandle* emcuetiti_findtopic(
 			if (strcmp(t->topicpart, topicpart) == 0) {
 				printf("here\n");
 				break;
-			}
-			else
+			} else
 				printf("not %s\n", t->topicpart);
 		}
 	}
@@ -123,9 +137,11 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 	switch (packetype) {
 	case LIBMQTT_PACKETTYPE_CONNECT:
 		libmqtt_construct_connack(writefunc, userdata);
+		cs->readstate = CLIENTREADSTATE_IDLE;
 		break;
 	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
 		libmqtt_construct_suback(writefunc, userdata, returncodes, 1);
+		cs->readstate = CLIENTREADSTATE_IDLE;
 		break;
 	case LIBMQTT_PACKETTYPE_PUBLISH: {
 		printf("handling publish\n");
@@ -147,10 +163,17 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 			} else
 				topicpart[topicpartpos++] = cs->buffer[2 + i];
 		}
+		cs->publishtopic = t;
+		cs->publishpayloadlen = cs->varheaderandpayloadlen - (topiclen + 2);
+		cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
+		cs->bufferpos = topiclen + 2;
+
+		if (broker->publishreadycallback != NULL)
+			broker->publishreadycallback(cs->client, cs->publishpayloadlen);
 	}
 		break;
 	}
-	cs->readstate = CLIENTREADSTATE_IDLE;
+
 }
 
 void emcuetiti_poll(emcuetiti_brokerhandle* broker) {
@@ -179,12 +202,15 @@ static emcuetiti_topichandle* emcuetiti_findparent(
 
 void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
-		const char* topicpart) {
+		const char* topicpart, bool targetable) {
 
-	part->topicpart = topicpart;
+	// clear pointers
 	part->sibling = NULL;
 	part->child = NULL;
 	part->parent = NULL;
+
+	part->topicpart = topicpart;
+	part->targetable = targetable;
 
 	if (root == NULL) {
 		if (broker->root == NULL)
@@ -205,12 +231,16 @@ void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 	}
 }
 
-void emcuetiti_init(emcuetiti_brokerhandle* broker) {
+void emcuetiti_init(emcuetiti_brokerhandle* broker,
+		emcuetitit_publishreadyfunc publishreadycallback) {
+	// clear out state
 	broker->root = NULL;
 	broker->registeredclients = 0;
 	broker->subscribedtopics = 0;
 	memset(broker->clients, 0, sizeof(broker->clients));
 	memset(broker->subscriptions, 0, sizeof(broker->subscriptions));
+	// wireup callbacks
+	broker->publishreadycallback = publishreadycallback;
 }
 
 static void emcuetiti_dumpstate_printtopic(emcuetiti_topichandle* node) {
@@ -235,7 +265,12 @@ static void emcuetiti_dumpstate_child(emcuetiti_topichandle* node) {
 }
 
 void emcuetiti_dumpstate(emcuetiti_brokerhandle* broker) {
-	printf("Topic hierachy\n");
+	printf("--Topic hierachy--\n");
 	emcuetiti_topichandle* th = broker->root;
 	emcuetiti_dumpstate_child(th);
+
+	printf("-- Clients --\n");
+	for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
+
+	}
 }

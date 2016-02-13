@@ -16,6 +16,8 @@ typedef enum {
 	CONNECT, SUBSCRIBE, PUBLISH, FINISHED
 } teststate;
 
+static emcuetiti_brokerhandle broker;
+
 static teststate state = CONNECT;
 
 static uint8_t connectpkt[64];
@@ -99,6 +101,18 @@ static bool readytoread(void* userdata) {
 	return (state != FINISHED);
 }
 
+static int publishready(emcuetiti_clienthandle* client, size_t payloadlen) {
+	printf("publish\n");
+	uint8_t buff[64];
+
+	emcuetiti_client_readpublish(&broker, client, buff, payloadlen);
+	buff[payloadlen] = '\0';
+
+	printf("payload %s\n", buff);
+
+	return 0;
+}
+
 int main(int argv, char** argc) {
 
 	printf("creating packets\n");
@@ -123,14 +137,13 @@ int main(int argv, char** argc) {
 
 	printf("setting up broker\n");
 
-	emcuetiti_brokerhandle broker;
 	emcuetiti_topichandle topic;
 
 	emcuetiti_clienthandle client = { .writefunc = connection_writefunc,
 			.readytoread = readytoread, .readfunc = readfunc };
 
-	emcuetiti_init(&broker);
-	emcuetiti_addtopicpart(&broker, NULL, &topic, "topic");
+	emcuetiti_init(&broker, publishready);
+	emcuetiti_addtopicpart(&broker, NULL, &topic, "topic", true);
 
 	emcuetiti_client_register(&broker, &client);
 
