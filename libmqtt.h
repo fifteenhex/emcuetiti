@@ -60,3 +60,5 @@ int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 
 int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 		size_t bufferlen);
+
+int libmqtt_decodelength(uint8_t* buffer, size_t* len);

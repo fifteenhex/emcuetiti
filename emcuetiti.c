@@ -92,7 +92,27 @@ static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 	}
 }
 
-static void emcuetiti_handleinboundpacket(emcuetiti_clientstate* cs) {
+static emcuetiti_topichandle* emcuetiti_findtopic(
+		emcuetiti_brokerhandle* broker, emcuetiti_topichandle* root,
+		const char* topicpart) {
+
+	if (root == NULL) {
+		emcuetiti_topichandle* t = broker->root;
+		for (; t != NULL; t = t->sibling) {
+			if (strcmp(t->topicpart, topicpart) == 0) {
+				printf("here\n");
+				break;
+			}
+			else
+				printf("not %s\n", t->topicpart);
+		}
+	}
+
+	return NULL;
+}
+
+static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* cs) {
 	uint8_t packetype = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(
 			cs->packettype);
 	libmqtt_writefunc writefunc = cs->client->writefunc;
@@ -107,8 +127,27 @@ static void emcuetiti_handleinboundpacket(emcuetiti_clientstate* cs) {
 	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
 		libmqtt_construct_suback(writefunc, userdata, returncodes, 1);
 		break;
-	case LIBMQTT_PACKETTYPE_PUBLISH:
-
+	case LIBMQTT_PACKETTYPE_PUBLISH: {
+		printf("handling publish\n");
+		uint16_t topiclen = (cs->buffer[0] << 8) | cs->buffer[1];
+		char topicpart[32];
+		int topicpartpos = 0;
+		emcuetiti_topichandle* t = NULL;
+		for (uint16_t i = 0; i < topiclen; i++) {
+			if (i + 1 == topiclen) {
+				topicpart[topicpartpos++] = cs->buffer[2 + i];
+				topicpart[topicpartpos] = '\0';
+				printf("%s\n", topicpart);
+				t = emcuetiti_findtopic(broker, t, topicpart);
+			} else if (cs->buffer[2 + i] == '/') {
+				topicpart[topicpartpos] = '\0';
+				topicpartpos = 0;
+				printf("%s\n", topicpart);
+				t = emcuetiti_findtopic(broker, t, topicpart);
+			} else
+				topicpart[topicpartpos++] = cs->buffer[2 + i];
+		}
+	}
 		break;
 	}
 	cs->readstate = CLIENTREADSTATE_IDLE;
@@ -121,7 +160,7 @@ void emcuetiti_poll(emcuetiti_brokerhandle* broker) {
 			if (cs->client != NULL) {
 				emcuetiti_poll_read(cs);
 				if (cs->readstate == CLIENTREADSTATE_COMPLETE)
-					emcuetiti_handleinboundpacket(cs);
+					emcuetiti_handleinboundpacket(broker, cs);
 			}
 		}
 	}
