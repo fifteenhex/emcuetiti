@@ -90,10 +90,9 @@ typedef struct {
 } emcuetiti_publish;
 
 // These functions are to be driven by the code running on the broker
-// to publish to clients and the receive publishes from clients
-void emcuetiti_local_send(emcuetiti_publish* publish);
-void emcuetiti_local_recv(emcuetiti_publish* publish);
-int emcuetiti_local_waiting(void);
+// to publish to clients
+void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
+		emcuetiti_publish* publish);
 
 //
 void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
