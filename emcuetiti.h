@@ -67,8 +67,15 @@ typedef struct {
 	emcuetiti_topichandle* topic;
 } emcuetiti_subscriptionhandle;
 
-typedef int (*emcuetitit_publishreadyfunc)(emcuetiti_clienthandle* client,
+typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_clienthandle* client,
 		size_t payloadlen);
+
+typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
+
+typedef struct {
+	emcuetiti_publishreadyfunc publishreadycallback;
+	emcuetiti_authenticateclientfunc authenticatecallback;
+} emcuetiti_brokerhandle_callbacks;
 
 typedef struct {
 	unsigned registeredclients;
@@ -78,7 +85,7 @@ typedef struct {
 	emcuetiti_subscriptionhandle subscriptions[EMCUETITI_CONFIG_MAXCLIENTS
 			* EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
 
-	emcuetitit_publishreadyfunc publishreadycallback;
+	emcuetiti_brokerhandle_callbacks callbacks;
 } emcuetiti_brokerhandle;
 
 typedef struct {
@@ -108,5 +115,5 @@ void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
 		const char* topicpart, bool targetable);
 void emcuetiti_init(emcuetiti_brokerhandle* broker,
-		emcuetitit_publishreadyfunc publishreadycallback);
+		emcuetiti_publishreadyfunc publishreadycallback);
 void emcuetiti_dumpstate(emcuetiti_brokerhandle* broker);

@@ -156,8 +156,9 @@ static void emcuetiti_handleinboundpacket_publish(
 	cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
 	cs->bufferpos = topiclen + 2;
 
-	if (broker->publishreadycallback != NULL)
-		broker->publishreadycallback(cs->client, cs->publishpayloadlen);
+	if (broker->callbacks.publishreadycallback != NULL)
+		broker->callbacks.publishreadycallback(cs->client,
+				cs->publishpayloadlen);
 }
 
 static void emcuetiti_handleinboardpacket_connect(
@@ -198,7 +199,10 @@ static void emcuetiti_handleinboardpacket_connect(
 	printf("protoname %s, level %d, keepalive %d, clientid %s \n", protocolname,
 			(int) level, (int) keepalive, id);
 
-	libmqtt_construct_connack(writefunc, userdata);
+	if (broker->callbacks.authenticatecallback == NULL
+			|| broker->callbacks.authenticatecallback(id)) {
+		libmqtt_construct_connack(writefunc, userdata);
+	}
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
@@ -285,7 +289,7 @@ void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 }
 
 void emcuetiti_init(emcuetiti_brokerhandle* broker,
-		emcuetitit_publishreadyfunc publishreadycallback) {
+		emcuetiti_publishreadyfunc publishreadycallback) {
 	// clear out state
 	broker->root = NULL;
 	broker->registeredclients = 0;
@@ -293,7 +297,8 @@ void emcuetiti_init(emcuetiti_brokerhandle* broker,
 	memset(broker->clients, 0, sizeof(broker->clients));
 	memset(broker->subscriptions, 0, sizeof(broker->subscriptions));
 	// wireup callbacks
-	broker->publishreadycallback = publishreadycallback;
+	broker->callbacks.publishreadycallback = publishreadycallback;
+	broker->callbacks.authenticatecallback = NULL;
 }
 
 static void emcuetiti_dumpstate_printtopic(emcuetiti_topichandle* node) {
