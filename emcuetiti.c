@@ -7,6 +7,13 @@
 #include "emcuetiti_priv.h"
 #include "emcuetiti.h"
 
+static size_t min(size_t a, size_t b) {
+	if (a < b)
+		return a;
+	else
+		return b;
+}
+
 void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle) {
 	if (broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS) {
@@ -62,7 +69,12 @@ int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
 		}
 	}
 
+	len = min(len, cs->publishpayloadlen);
+
 	memcpy(buffer, cs->buffer + cs->bufferpos, len);
+
+	cs->readstate = CLIENTREADSTATE_IDLE;
+
 	return len;
 }
 
