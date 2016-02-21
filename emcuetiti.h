@@ -46,7 +46,8 @@ typedef struct emcuetiti_topichandle {
 
 typedef struct {
 	emcuetiti_clienthandle* client;
-	char clientid[LIBMQTT_CLIENTID_MAXLENGTH];
+	char clientid[LIBMQTT_CLIENTID_MAXLENGTH + 1];
+	uint16_t keepalive;
 
 	unsigned subscriptions;
 

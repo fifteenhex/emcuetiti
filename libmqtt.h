@@ -42,6 +42,11 @@ typedef enum {
 #define LIBMQTT_CONNECTRETURNCODE_BADUSERNAMEORPASSWORD			4
 #define LIBMQTT_CONNECTRETURNCODE_NOTAUTHORISED					5
 
+#define LIBMQTT_SUBSCRIBERETURNCODE_QOS0GRANTED					0x0
+#define LIBMQTT_SUBSCRIBERETURNCODE_QOS1GRANTED					0x1
+#define LIBMQTT_SUBSCRIBERETURNCODE_QOS2GRANTED					0x2
+#define LIBMQTT_SUBSCRIBERETURNCODE_FAILURE						0x80
+
 typedef int (*libmqtt_writefunc)(void* userdata, const uint8_t* buffer,
 		size_t len);
 typedef int (*libmqtt_readfunc)(void* userdata, uint8_t* buffer, size_t len);
@@ -69,7 +74,7 @@ int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 		libmqtt_subscription* subscriptions, int numsubscriptions);
 
 int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
-		uint8_t* returncodes, int numreturncodes);
+		uint16_t id, uint8_t* returncodes, int numreturncodes);
 
 int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 		size_t bufferlen);

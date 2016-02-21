@@ -19,7 +19,21 @@ static int publishreadycallback(emcuetiti_clienthandle* client) {
  typedef void (*emcuetiti_disconnectfunc)(void* userdata);*/
 
 bool readytoread(void* userdata) {
-	return false;
+	GSocket* socket = (GSocket*) userdata;
+	return g_socket_condition_check(socket, G_IO_IN) == G_IO_IN;
+}
+
+int gsocket_read(void* userdata, uint8_t* buffer, size_t offset, size_t len) {
+	GSocket* socket = (GSocket*) userdata;
+	int ret = g_socket_receive(socket, buffer, len, NULL, NULL);
+	return ret;
+
+}
+
+int gsocket_write(void* userdata, uint8_t* buffer, size_t len) {
+	GSocket* socket = (GSocket*) userdata;
+	int ret = g_socket_send(socket, buffer, len, NULL, NULL);
+	return ret;
 }
 
 int main(int argc, char** argv) {
@@ -68,6 +82,8 @@ int main(int argc, char** argv) {
 				emcuetiti_clienthandle* client = g_malloc(
 						sizeof(emcuetiti_clienthandle));
 				client->readytoread = readytoread;
+				client->readfunc = gsocket_read;
+				client->writefunc = gsocket_write;
 				client->userdata = clientsocket;
 				emcuetiti_client_register(&broker, client);
 

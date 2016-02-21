@@ -123,6 +123,7 @@ static emcuetiti_topichandle* emcuetiti_findtopic(
 		emcuetiti_brokerhandle* broker, emcuetiti_topichandle* root,
 		const char* topicpart) {
 
+	printf("looking for %s\n", topicpart);
 	if (root == NULL) {
 		emcuetiti_topichandle* t = broker->root;
 		for (; t != NULL; t = t->sibling) {
@@ -139,30 +140,52 @@ static emcuetiti_topichandle* emcuetiti_findtopic(
 
 static void emcuetiti_handleinboundpacket_pingreq(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+	printf("pingreq from %s\n", cs->clientid);
 	libmqtt_construct_pingresp(cs->client->writefunc, cs->client->userdata);
 }
 
-static void emcuetiti_handleinboundpacket_publish(
-		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	printf("handling publish\n");
-	uint16_t topiclen = (cs->buffer[0] << 8) | cs->buffer[1];
-	char topicpart[32];
+static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
+		emcuetiti_brokerhandle* broker, uint8_t* buffer, uint16_t* topiclen) {
+
 	int topicpartpos = 0;
+	char topicpart[32];
+
+	uint16_t len = (*(buffer++) << 8) | *(buffer++);
+
+	printf("part len is %d\n", len);
+
 	emcuetiti_topichandle* t = NULL;
-	for (uint16_t i = 0; i < topiclen; i++) {
-		if (i + 1 == topiclen) {
-			topicpart[topicpartpos++] = cs->buffer[2 + i];
+	for (uint16_t i = 0; i < len; i++) {
+		uint8_t byte = *(buffer++);
+		if (i + 1 == len) {
+			topicpart[topicpartpos++] = byte;
 			topicpart[topicpartpos] = '\0';
 			printf("%s\n", topicpart);
 			t = emcuetiti_findtopic(broker, t, topicpart);
-		} else if (cs->buffer[2 + i] == '/') {
+		} else if (byte == '/') {
 			topicpart[topicpartpos] = '\0';
 			topicpartpos = 0;
 			printf("%s\n", topicpart);
 			t = emcuetiti_findtopic(broker, t, topicpart);
 		} else
-			topicpart[topicpartpos++] = cs->buffer[2 + i];
+			topicpart[topicpartpos++] = byte;
+
 	}
+
+	if (topiclen != NULL)
+		*topiclen = len;
+
+	return t;
+}
+
+static void emcuetiti_handleinboundpacket_publish(
+		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+	printf("handling publish\n");
+
+	uint16_t topiclen;
+	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
+			cs->buffer, &topiclen);
+
 	cs->publishtopic = t;
 	cs->publishpayloadlen = cs->varheaderandpayloadlen - (topiclen + 2);
 	cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
@@ -188,12 +211,11 @@ static void emcuetiti_handleinboardpacket_connect(
 	uint8_t level = *(buff++);
 	uint8_t flags = *(buff++);
 
-	uint16_t keepalive = (*(buff++) << 8) | *(buff++);
+	cs->keepalive = (*(buff++) << 8) | *(buff++);
 
 	uint16_t idlen = (*(buff++) << 8) | *(buff++);
-	char id[LIBMQTT_CLIENTID_MAXLENGTH + 1];
-	memcpy(id, buff, idlen);
-	id[idlen] = '\0';
+	memcpy(cs->clientid, buff, idlen);
+	cs->clientid[idlen] = '\0';
 	buff += idlen;
 
 	if (flags & LIBMQTT_CONNECTFLAG_WILL) {
@@ -209,12 +231,40 @@ static void emcuetiti_handleinboardpacket_connect(
 	}
 
 	printf("protoname %s, level %d, keepalive %d, clientid %s \n", protocolname,
-			(int) level, (int) keepalive, id);
+			(int) level, (int) cs->keepalive, cs->clientid);
 
 	if (broker->callbacks.authenticatecallback == NULL
-			|| broker->callbacks.authenticatecallback(id)) {
+			|| broker->callbacks.authenticatecallback(cs->clientid)) {
 		libmqtt_construct_connack(writefunc, userdata);
 	}
+	cs->readstate = CLIENTREADSTATE_IDLE;
+}
+
+static void emcuetiti_handleinboundpacket_subscribe(
+		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+	libmqtt_writefunc writefunc = cs->client->writefunc;
+	void* userdata = cs->client->userdata;
+	uint8_t returncodes[] = { 0 };
+
+	uint8_t* buffer = cs->buffer;
+	uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
+
+	uint16_t topiclen;
+	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
+			buffer, &topiclen);
+	buffer += 2 + topiclen;
+
+	uint8_t qos = *(buffer++);
+
+	if (t == NULL) {
+		printf("client tried to sub to nonexisting topic\n");
+		returncodes[0] = LIBMQTT_SUBSCRIBERETURNCODE_FAILURE;
+	}
+
+	printf("sub from %s, messageid %d, qos %d\n", cs->clientid, (int) messageid,
+			(int) qos);
+
+	libmqtt_construct_suback(writefunc, userdata, messageid, returncodes, 1);
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
@@ -222,18 +272,13 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		emcuetiti_clientstate* cs) {
 	uint8_t packetype = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(
 			cs->packettype);
-	libmqtt_writefunc writefunc = cs->client->writefunc;
 
-	uint8_t returncodes[] = { 0 };
-
-	void* userdata = cs->client->userdata;
 	switch (packetype) {
 	case LIBMQTT_PACKETTYPE_CONNECT:
 		emcuetiti_handleinboardpacket_connect(broker, cs);
 		break;
 	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
-		libmqtt_construct_suback(writefunc, userdata, returncodes, 1);
-		cs->readstate = CLIENTREADSTATE_IDLE;
+		emcuetiti_handleinboundpacket_subscribe(broker, cs);
 		break;
 	case LIBMQTT_PACKETTYPE_PUBLISH:
 		emcuetiti_handleinboundpacket_publish(broker, cs);
