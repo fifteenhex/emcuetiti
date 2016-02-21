@@ -67,8 +67,15 @@ typedef struct {
 	emcuetiti_topichandle* topic;
 } emcuetiti_subscriptionhandle;
 
-typedef int (*emcuetitit_publishreadyfunc)(emcuetiti_clienthandle* client,
+typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_clienthandle* client,
 		size_t payloadlen);
+
+typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
+
+typedef struct {
+	emcuetiti_publishreadyfunc publishreadycallback;
+	emcuetiti_authenticateclientfunc authenticatecallback;
+} emcuetiti_brokerhandle_callbacks;
 
 typedef struct {
 	unsigned registeredclients;
@@ -78,7 +85,7 @@ typedef struct {
 	emcuetiti_subscriptionhandle subscriptions[EMCUETITI_CONFIG_MAXCLIENTS
 			* EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
 
-	emcuetitit_publishreadyfunc publishreadycallback;
+	emcuetiti_brokerhandle_callbacks callbacks;
 } emcuetiti_brokerhandle;
 
 typedef struct {
@@ -90,10 +97,9 @@ typedef struct {
 } emcuetiti_publish;
 
 // These functions are to be driven by the code running on the broker
-// to publish to clients and the receive publishes from clients
-void emcuetiti_local_send(emcuetiti_publish* publish);
-void emcuetiti_local_recv(emcuetiti_publish* publish);
-int emcuetiti_local_waiting(void);
+// to publish to clients
+void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
+		emcuetiti_publish* publish);
 
 //
 void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
@@ -109,5 +115,5 @@ void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
 		const char* topicpart, bool targetable);
 void emcuetiti_init(emcuetiti_brokerhandle* broker,
-		emcuetitit_publishreadyfunc publishreadycallback);
+		emcuetiti_publishreadyfunc publishreadycallback);
 void emcuetiti_dumpstate(emcuetiti_brokerhandle* broker);
