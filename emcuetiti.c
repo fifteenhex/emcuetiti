@@ -40,19 +40,6 @@ void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 
 				// clear the client and it's subscriptions
 				cs->client = NULL;
-				broker->subscribedtopics -= cs->subscriptions;
-
-				for (int j = 0; j < ARRAY_ELEMENTS(broker->subscriptions);
-						j++) {
-					if (cs->client == handle) {
-						broker->subscriptions[j].client = NULL;
-						broker->subscriptions[j].topic = NULL;
-						cs->subscriptions--;
-						if (cs->subscriptions == 0)
-							break;
-					}
-				}
-
 				break;
 			}
 		}
@@ -84,18 +71,18 @@ static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 	int read;
 	switch (cs->readstate) {
 	case CLIENTREADSTATE_IDLE:
-		if (cs->client->readytoread(cs->client->userdata)) {
+		if (cs->client->ops->readytoread(cs->client->userdata)) {
 			cs->readstate = CLIENTREADSTATE_TYPE;
 			cs->bufferpos = 0;
 		}
 		break;
 	case CLIENTREADSTATE_TYPE:
-		if (cs->client->readfunc(userdata, &(cs->packettype), 0, 1) == 1) {
+		if (cs->client->ops->readfunc(userdata, &(cs->packettype), 0, 1) == 1) {
 			cs->readstate = CLIENTREADSTATE_REMAININGLEN;
 		}
 		break;
 	case CLIENTREADSTATE_REMAININGLEN:
-		if (cs->client->readfunc(userdata, offsetbuffer, 0, 1) == 1) {
+		if (cs->client->ops->readfunc(userdata, offsetbuffer, 0, 1) == 1) {
 			if ((*offsetbuffer & (1 << 7)) == 0) {
 				libmqtt_decodelength(cs->buffer, &cs->varheaderandpayloadlen);
 				if (cs->varheaderandpayloadlen > 0) {
@@ -108,7 +95,7 @@ static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 		}
 		break;
 	case CLIENTREADSTATE_PAYLOAD:
-		read = cs->client->readfunc(userdata, offsetbuffer, 0,
+		read = cs->client->ops->readfunc(userdata, offsetbuffer, 0,
 				cs->remainingbytes);
 		if (read > 0) {
 			cs->remainingbytes -= read;
@@ -129,7 +116,7 @@ static emcuetiti_topichandle* emcuetiti_findtopic(
 		for (; t != NULL; t = t->sibling) {
 			if (strcmp(t->topicpart, topicpart) == 0) {
 				printf("here\n");
-				break;
+				return t;
 			} else
 				printf("not %s\n", t->topicpart);
 		}
@@ -141,7 +128,9 @@ static emcuetiti_topichandle* emcuetiti_findtopic(
 static void emcuetiti_handleinboundpacket_pingreq(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	printf("pingreq from %s\n", cs->clientid);
-	libmqtt_construct_pingresp(cs->client->writefunc, cs->client->userdata);
+	libmqtt_construct_pingresp(cs->client->ops->writefunc,
+			cs->client->userdata);
+	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
 static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
@@ -178,6 +167,12 @@ static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 	return t;
 }
 
+static void emcuetiti_disconnectclient(emcuetiti_clientstate* cs) {
+	if (cs->client->ops->disconnectfunc != NULL)
+		cs->client->ops->disconnectfunc(cs->client);
+	cs->readstate = CLIENTREADSTATE_IDLE;
+}
+
 static void emcuetiti_handleinboundpacket_publish(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	printf("handling publish\n");
@@ -186,19 +181,24 @@ static void emcuetiti_handleinboundpacket_publish(
 	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
 			cs->buffer, &topiclen);
 
-	cs->publishtopic = t;
-	cs->publishpayloadlen = cs->varheaderandpayloadlen - (topiclen + 2);
-	cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
-	cs->bufferpos = topiclen + 2;
+	if (t != NULL) {
+		cs->publishtopic = t;
+		cs->publishpayloadlen = cs->varheaderandpayloadlen - (topiclen + 2);
+		cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
+		cs->bufferpos = topiclen + 2;
 
-	if (broker->callbacks.publishreadycallback != NULL)
-		broker->callbacks.publishreadycallback(cs->client,
-				cs->publishpayloadlen);
+		if (broker->callbacks->publishreadycallback != NULL)
+			broker->callbacks->publishreadycallback(cs->client,
+					cs->publishpayloadlen);
+	} else {
+		printf("publish to invalid topic\n");
+		emcuetiti_disconnectclient(cs);
+	}
 }
 
 static void emcuetiti_handleinboardpacket_connect(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	libmqtt_writefunc writefunc = cs->client->writefunc;
+	libmqtt_writefunc writefunc = cs->client->ops->writefunc;
 	void* userdata = cs->client->userdata;
 
 	uint8_t* buff = cs->buffer;
@@ -233,8 +233,8 @@ static void emcuetiti_handleinboardpacket_connect(
 	printf("protoname %s, level %d, keepalive %d, clientid %s \n", protocolname,
 			(int) level, (int) cs->keepalive, cs->clientid);
 
-	if (broker->callbacks.authenticatecallback == NULL
-			|| broker->callbacks.authenticatecallback(cs->clientid)) {
+	if (broker->callbacks->authenticatecallback == NULL
+			|| broker->callbacks->authenticatecallback(cs->clientid)) {
 		libmqtt_construct_connack(writefunc, userdata);
 	}
 	cs->readstate = CLIENTREADSTATE_IDLE;
@@ -242,7 +242,7 @@ static void emcuetiti_handleinboardpacket_connect(
 
 static void emcuetiti_handleinboundpacket_subscribe(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	libmqtt_writefunc writefunc = cs->client->writefunc;
+	libmqtt_writefunc writefunc = cs->client->ops->writefunc;
 	void* userdata = cs->client->userdata;
 	uint8_t returncodes[] = { 0 };
 
@@ -256,13 +256,15 @@ static void emcuetiti_handleinboundpacket_subscribe(
 
 	uint8_t qos = *(buffer++);
 
+	printf("sub from %s, messageid %d, qos %d\n", cs->clientid, (int) messageid,
+			(int) qos);
+
 	if (t == NULL) {
 		printf("client tried to sub to nonexisting topic\n");
 		returncodes[0] = LIBMQTT_SUBSCRIBERETURNCODE_FAILURE;
+	} else {
+		cs->subscriptions[cs->numsubscriptions++] = t;
 	}
-
-	printf("sub from %s, messageid %d, qos %d\n", cs->clientid, (int) messageid,
-			(int) qos);
 
 	libmqtt_construct_suback(writefunc, userdata, messageid, returncodes, 1);
 	cs->readstate = CLIENTREADSTATE_IDLE;
@@ -291,13 +293,18 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 }
 
 void emcuetiti_poll(emcuetiti_brokerhandle* broker) {
+	EMCUETITI_CONFIG_TIMESTAMPTYPE now = broker->callbacks->timestamp();
 	if (broker->registeredclients > 0) {
 		for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
 			emcuetiti_clientstate* cs = broker->clients + i;
 			if (cs->client != NULL) {
-				emcuetiti_poll_read(cs);
-				if (cs->readstate == CLIENTREADSTATE_COMPLETE)
-					emcuetiti_handleinboundpacket(broker, cs);
+				if (cs->client->ops->isconnectedfunc(cs->client->userdata)) {
+					emcuetiti_poll_read(cs);
+					if (cs->readstate == CLIENTREADSTATE_COMPLETE)
+						emcuetiti_handleinboundpacket(broker, cs);
+				} else {
+					printf("client %s disconnected\n", cs->clientid);
+				}
 			}
 		}
 	}
@@ -345,17 +352,11 @@ void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 	}
 }
 
-void emcuetiti_init(emcuetiti_brokerhandle* broker,
-		emcuetiti_publishreadyfunc publishreadycallback) {
+void emcuetiti_init(emcuetiti_brokerhandle* broker) {
 	// clear out state
 	broker->root = NULL;
 	broker->registeredclients = 0;
-	broker->subscribedtopics = 0;
 	memset(broker->clients, 0, sizeof(broker->clients));
-	memset(broker->subscriptions, 0, sizeof(broker->subscriptions));
-	// wireup callbacks
-	broker->callbacks.publishreadycallback = publishreadycallback;
-	broker->callbacks.authenticatecallback = NULL;
 }
 
 static void emcuetiti_dumpstate_printtopic(emcuetiti_topichandle* node) {

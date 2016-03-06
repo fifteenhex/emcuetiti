@@ -36,6 +36,27 @@ int gsocket_write(void* userdata, uint8_t* buffer, size_t len) {
 	return ret;
 }
 
+static bool gsocket_isconnected(void* userdata) {
+	GSocket* socket = (GSocket*) userdata;
+	return g_socket_is_connected(socket);
+}
+
+static emcuetiti_clientops gsocketclientops = { //
+		.isconnectedfunc = gsocket_isconnected, //
+				.readytoread = readytoread, //
+				.readfunc = gsocket_read, //
+				.writefunc = gsocket_write //
+		};
+
+static uint32_t timestamp() {
+	return 0;
+}
+
+static emcuetiti_brokerhandle_callbacks brokerops = { //
+		.authenticatecallback = NULL, //
+				.publishreadycallback = publishreadycallback, //
+				.timestamp = timestamp };
+
 int main(int argc, char** argv) {
 
 	GSocketAddress* serversockaddr = g_inet_socket_address_new_from_string(
@@ -55,12 +76,14 @@ int main(int argc, char** argv) {
 	if (g_socket_listen(serversocket, NULL)) {
 
 		emcuetiti_brokerhandle broker;
+		broker.callbacks = &brokerops;
+
 		emcuetiti_topichandle topic1, subtopic1;
 
 		emcuetiti_topichandle topic2, topic2subtopic1, topic2subtopic2,
 				topic2subtopic2subtopic1;
 
-		emcuetiti_init(&broker, publishreadycallback);
+		emcuetiti_init(&broker);
 
 		emcuetiti_addtopicpart(&broker, NULL, &topic1, "topic1", true);
 		emcuetiti_addtopicpart(&broker, &topic1, &subtopic1, "subtopic1", true);
@@ -81,10 +104,9 @@ int main(int argc, char** argv) {
 				g_message("incoming connection");
 				emcuetiti_clienthandle* client = g_malloc(
 						sizeof(emcuetiti_clienthandle));
-				client->readytoread = readytoread;
-				client->readfunc = gsocket_read;
-				client->writefunc = gsocket_write;
+
 				client->userdata = clientsocket;
+				client->ops = &gsocketclientops;
 				emcuetiti_client_register(&broker, client);
 
 			}
