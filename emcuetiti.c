@@ -111,15 +111,17 @@ static emcuetiti_topichandle* emcuetiti_findtopic(
 		const char* topicpart) {
 
 	printf("looking for %s\n", topicpart);
-	if (root == NULL) {
-		emcuetiti_topichandle* t = broker->root;
-		for (; t != NULL; t = t->sibling) {
-			if (strcmp(t->topicpart, topicpart) == 0) {
-				printf("here\n");
-				return t;
-			} else
-				printf("not %s\n", t->topicpart);
-		}
+	if (root == NULL)
+		root = broker->root;
+	else
+		root = root->child;
+
+	for (; root != NULL; root = root->sibling) {
+		if (strcmp(root->topicpart, topicpart) == 0) {
+			printf("found %s\n", topicpart);
+			return root;
+		} else
+			printf("not %s\n", root->topicpart);
 	}
 
 	return NULL;
@@ -174,8 +176,12 @@ static void emcuetiti_disconnectclient(emcuetiti_clientstate* cs) {
 }
 
 static void emcuetiti_handleinboundpacket_publish(
-		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs,
+		uint8_t flags) {
 	printf("handling publish\n");
+
+	libmqtt_qos qos = (flags >> 1) & 0x3;
+	uint16_t messageid;
 
 	uint16_t topiclen;
 	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
@@ -187,9 +193,20 @@ static void emcuetiti_handleinboundpacket_publish(
 		cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
 		cs->bufferpos = topiclen + 2;
 
+		if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
+			messageid = (cs->buffer[cs->bufferpos] << 8)
+					| cs->buffer[cs->bufferpos + 1];
+			cs->bufferpos += 2;
+		}
+
 		if (broker->callbacks->publishreadycallback != NULL)
 			broker->callbacks->publishreadycallback(cs->client,
 					cs->publishpayloadlen);
+
+		if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
+			libmqtt_construct_puback(cs->client->ops->writefunc,
+					cs->client->userdata, messageid);
+		}
 	} else {
 		printf("publish to invalid topic\n");
 		emcuetiti_disconnectclient(cs);
@@ -270,9 +287,16 @@ static void emcuetiti_handleinboundpacket_subscribe(
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
+static void emcuetiti_handleinboundpacket_disconnect(
+		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+	emcuetiti_disconnectclient(cs);
+}
+
 static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		emcuetiti_clientstate* cs) {
 	uint8_t packetype = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(
+			cs->packettype);
+	uint8_t packetflags = LIBMQTT_PACKETFLAGSFROMPACKETTYPEANDFLAGS(
 			cs->packettype);
 
 	switch (packetype) {
@@ -283,10 +307,13 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		emcuetiti_handleinboundpacket_subscribe(broker, cs);
 		break;
 	case LIBMQTT_PACKETTYPE_PUBLISH:
-		emcuetiti_handleinboundpacket_publish(broker, cs);
+		emcuetiti_handleinboundpacket_publish(broker, cs, packetflags);
 		break;
 	case LIBMQTT_PACKETTYPE_PINGREQ:
 		emcuetiti_handleinboundpacket_pingreq(broker, cs);
+		break;
+	case LIBMQTT_PACKETTYPE_DISCONNECT:
+		emcuetiti_handleinboundpacket_disconnect(broker, cs);
 		break;
 	}
 

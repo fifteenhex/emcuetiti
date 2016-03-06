@@ -3,8 +3,16 @@
 #include <stdbool.h>
 #include "emcuetiti.h"
 
-static int publishreadycallback(emcuetiti_clienthandle* client) {
+emcuetiti_brokerhandle broker;
+static int publishreadycallback(emcuetiti_clienthandle* client,
+		size_t publishlen) {
 	printf("publish ready\n");
+	uint8_t* buffer = g_malloc(publishlen + 1);
+	int read = emcuetiti_client_readpublish(&broker, client, buffer,
+			publishlen);
+	buffer[read] = '\0';
+	printf("publish %s\n", (char *) buffer);
+	g_free(buffer);
 	return 0;
 }
 
@@ -75,7 +83,6 @@ int main(int argc, char** argv) {
 
 	if (g_socket_listen(serversocket, NULL)) {
 
-		emcuetiti_brokerhandle broker;
 		broker.callbacks = &brokerops;
 
 		emcuetiti_topichandle topic1, subtopic1;

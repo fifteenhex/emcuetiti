@@ -28,6 +28,7 @@ typedef enum {
 
 #define LIBMQTT_PACKETTYPE_SHIFT		4
 #define LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(tf) ((tf >> LIBMQTT_PACKETTYPE_SHIFT) & 0xf)
+#define LIBMQTT_PACKETFLAGSFROMPACKETTYPEANDFLAGS(tf) (tf & 0xf)
 
 #define LIBMQTT_CONNECTFLAG_CLEANSESSION	(1 << 1)
 #define LIBMQTT_CONNECTFLAG_WILL			(1 << 2)
@@ -70,11 +71,18 @@ int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
 		size_t payloadlen, libmqtt_qos qos, bool duplicate, bool retain,
 		uint16_t id);
 
+int libmqtt_construct_puback(libmqtt_writefunc writefunc, void* userdata,
+		uint16_t messageid);
+
 int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 		libmqtt_subscription* subscriptions, int numsubscriptions);
 
 int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t id, uint8_t* returncodes, int numreturncodes);
+
+int libmqtt_construct_pingreq(libmqtt_writefunc writefunc, void* userdata);
+
+int libmqtt_construct_pingresp(libmqtt_writefunc writefunc, void* userdata);
 
 int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 		size_t bufferlen);

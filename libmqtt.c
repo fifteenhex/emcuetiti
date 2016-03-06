@@ -31,10 +31,10 @@ static void libmqtt_appendlengthandstring(libmqtt_writefunc writefunc,
 }
 
 static int libmqtt_construct_genericack(libmqtt_writefunc writefunc,
-		void* userdata, uint8_t typeandflags) {
-	libmqtt_messageid_variableheader varheader = {
-
-	};
+		void* userdata, uint8_t typeandflags, uint16_t messageid) {
+	libmqtt_messageid_variableheader varheader = { //
+			.packetidmsb = (messageid >> 8) & 0xff, //
+					.packetidlsb = messageid & 0xff };
 
 	uint8_t fixedheader[LIBMQTT_MINIMUMFIXEDHEADERBYTES];
 	fixedheader[0] = typeandflags;
@@ -219,24 +219,25 @@ int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
 	return 0;
 }
 
-int libmqtt_construct_puback(libmqtt_writefunc writefunc, void* userdata) {
+int libmqtt_construct_puback(libmqtt_writefunc writefunc, void* userdata,
+		uint16_t messageid) {
 	return libmqtt_construct_genericack(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBACK, 0));
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBACK, 0), messageid);
 }
 
 int libmqtt_construct_pubrec(libmqtt_writefunc writefunc, void* userdata) {
 	return libmqtt_construct_genericack(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBREC, 0));
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBREC, 0), 0);
 }
 
 int libmqtt_construct_pubrel(libmqtt_writefunc writefunc, void* userdata) {
 	return libmqtt_construct_genericack(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBREL, 0));
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBREL, 0), 0);
 }
 
 int libmqtt_construct_pubcomp(libmqtt_writefunc writefunc, void* userdata) {
 	return libmqtt_construct_genericack(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBCOMP, 0));
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PUBCOMP, 0), 0);
 }
 
 int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
@@ -320,7 +321,7 @@ int libmqtt_construct_unsubscribe(libmqtt_writefunc writefunc, void* userdata,
 
 int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata) {
 	return libmqtt_construct_genericack(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_UNSUBACK, 0));
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_UNSUBACK, 0), 0);
 }
 
 int libmqtt_construct_pingreq(libmqtt_writefunc writefunc, void* userdata) {
