@@ -23,6 +23,7 @@ void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 			if (broker->clients[i].client == NULL) {
 				emcuetiti_clientstate* cs = broker->clients + i;
 				cs->client = handle;
+				cs->state = CLIENTSTATE_NEW;
 				cs->readstate = CLIENTREADSTATE_IDLE;
 				break;
 			}
@@ -127,10 +128,20 @@ static emcuetiti_topichandle* emcuetiti_findtopic(
 	return NULL;
 }
 
+static libmqtt_writefunc emcuetiti_resolvewritefunc(
+		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+	libmqtt_writefunc writefunc = broker->callbacks->writefunc;
+#if EMCUETITI_CONFIG_PERCLIENTCALLBACK_WRITE
+	if(cs->client->ops->writefunc != NULL)
+	writefunc = cs->client->ops->writefunc;
+#endif
+	return writefunc;
+}
+
 static void emcuetiti_handleinboundpacket_pingreq(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	printf("pingreq from %s\n", cs->clientid);
-	libmqtt_construct_pingresp(cs->client->ops->writefunc,
+	libmqtt_construct_pingresp(emcuetiti_resolvewritefunc(broker, cs),
 			cs->client->userdata);
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
@@ -169,9 +180,21 @@ static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 	return t;
 }
 
-static void emcuetiti_disconnectclient(emcuetiti_clientstate* cs) {
+static void emcuetiti_disconnectclient(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* cs) {
+#if EMCUETITI_CONFIG_PERCLIENTCALLBACK_DISCONNECT
 	if (cs->client->ops->disconnectfunc != NULL)
-		cs->client->ops->disconnectfunc(cs->client);
+	cs->client->ops->disconnectfunc(cs->client, cs->client->userdata);
+	else {
+#endif
+	if (broker->callbacks->disconnectfunc != NULL) {
+		broker->callbacks->disconnectfunc(cs->client, cs->client->userdata);
+	}
+#if EMCUETITI_CONFIG_PERCLIENTCALLBACK_DISCONNECT
+}
+#endif
+
+	cs->state = CLIENTSTATE_DISCONNECTED;
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
@@ -204,18 +227,17 @@ static void emcuetiti_handleinboundpacket_publish(
 					cs->publishpayloadlen);
 
 		if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
-			libmqtt_construct_puback(cs->client->ops->writefunc,
+			libmqtt_construct_puback(emcuetiti_resolvewritefunc(broker, cs),
 					cs->client->userdata, messageid);
 		}
 	} else {
 		printf("publish to invalid topic\n");
-		emcuetiti_disconnectclient(cs);
+		emcuetiti_disconnectclient(broker, cs);
 	}
 }
 
 static void emcuetiti_handleinboardpacket_connect(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	libmqtt_writefunc writefunc = cs->client->ops->writefunc;
 	void* userdata = cs->client->userdata;
 
 	uint8_t* buff = cs->buffer;
@@ -252,14 +274,14 @@ static void emcuetiti_handleinboardpacket_connect(
 
 	if (broker->callbacks->authenticatecallback == NULL
 			|| broker->callbacks->authenticatecallback(cs->clientid)) {
-		libmqtt_construct_connack(writefunc, userdata);
+		libmqtt_construct_connack(emcuetiti_resolvewritefunc(broker, cs),
+				userdata);
 	}
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
 static void emcuetiti_handleinboundpacket_subscribe(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	libmqtt_writefunc writefunc = cs->client->ops->writefunc;
 	void* userdata = cs->client->userdata;
 	uint8_t returncodes[] = { 0 };
 
@@ -283,28 +305,61 @@ static void emcuetiti_handleinboundpacket_subscribe(
 		cs->subscriptions[cs->numsubscriptions++] = t;
 	}
 
-	libmqtt_construct_suback(writefunc, userdata, messageid, returncodes, 1);
+	libmqtt_construct_suback(emcuetiti_resolvewritefunc(broker, cs), userdata,
+			messageid, returncodes, 1);
+	cs->readstate = CLIENTREADSTATE_IDLE;
+}
+
+static void emcuetiti_handleinboundpacket_unsubscribe(
+		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+	void* userdata = cs->client->userdata;
+
+	uint8_t* buffer = cs->buffer;
+	uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
+
+	uint16_t topiclen;
+	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
+			buffer, &topiclen);
+	buffer += 2 + topiclen;
+
+	uint8_t qos = *(buffer++);
+
+	printf("unsub from %s, messageid %d, qos %d\n", cs->clientid,
+			(int) messageid, (int) qos);
+
+	if (t == NULL) {
+		printf("client tried to unsub from nonexisting topic\n");
+	} else {
+		//cs->subscriptions[cs->numsubscriptions++] = t;
+	}
+
+	libmqtt_construct_unsuback(emcuetiti_resolvewritefunc(broker, cs), userdata,
+			messageid);
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
 static void emcuetiti_handleinboundpacket_disconnect(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	emcuetiti_disconnectclient(cs);
+	printf("client %s has requested to disconnect\n", cs->clientid);
+	emcuetiti_disconnectclient(broker, cs);
 }
 
 static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		emcuetiti_clientstate* cs) {
-	uint8_t packetype = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(
+	uint8_t packettype = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(
 			cs->packettype);
 	uint8_t packetflags = LIBMQTT_PACKETFLAGSFROMPACKETTYPEANDFLAGS(
 			cs->packettype);
 
-	switch (packetype) {
+	switch (packettype) {
 	case LIBMQTT_PACKETTYPE_CONNECT:
 		emcuetiti_handleinboardpacket_connect(broker, cs);
 		break;
 	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
 		emcuetiti_handleinboundpacket_subscribe(broker, cs);
+		break;
+	case LIBMQTT_PACKETTYPE_UNSUBSCRIBE:
+		emcuetiti_handleinboundpacket_unsubscribe(broker, cs);
 		break;
 	case LIBMQTT_PACKETTYPE_PUBLISH:
 		emcuetiti_handleinboundpacket_publish(broker, cs, packetflags);
@@ -314,6 +369,10 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		break;
 	case LIBMQTT_PACKETTYPE_DISCONNECT:
 		emcuetiti_handleinboundpacket_disconnect(broker, cs);
+		break;
+	default:
+		printf("unhandled packet type %d from client %s\n", (int) packettype,
+				cs->clientid);
 		break;
 	}
 
@@ -325,12 +384,18 @@ void emcuetiti_poll(emcuetiti_brokerhandle* broker) {
 		for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
 			emcuetiti_clientstate* cs = broker->clients + i;
 			if (cs->client != NULL) {
-				if (cs->client->ops->isconnectedfunc(cs->client->userdata)) {
-					emcuetiti_poll_read(cs);
-					if (cs->readstate == CLIENTREADSTATE_COMPLETE)
-						emcuetiti_handleinboundpacket(broker, cs);
-				} else {
-					printf("client %s disconnected\n", cs->clientid);
+				switch (cs->state) {
+				case CLIENTSTATE_NEW:
+				case CLIENTSTATE_CONNECTED:
+					if (cs->client->ops->isconnectedfunc(
+							cs->client->userdata)) {
+						emcuetiti_poll_read(cs);
+						if (cs->readstate == CLIENTREADSTATE_COMPLETE)
+							emcuetiti_handleinboundpacket(broker, cs);
+					} else {
+						printf("client %s disconnected\n", cs->clientid);
+					}
+					break;
 				}
 			}
 		}

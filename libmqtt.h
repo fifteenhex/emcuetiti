@@ -24,7 +24,7 @@ typedef enum {
 #define LIBMQTT_PACKETTYPE_UNSUBACK		11
 #define LIBMQTT_PACKETTYPE_PINGREQ		12
 #define LIBMQTT_PACKETTYPE_PINGRESP		13
-#define LIBMQTT_PACKETTYPE_DISCONNECT	15
+#define LIBMQTT_PACKETTYPE_DISCONNECT	14
 
 #define LIBMQTT_PACKETTYPE_SHIFT		4
 #define LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(tf) ((tf >> LIBMQTT_PACKETTYPE_SHIFT) & 0xf)
@@ -57,6 +57,8 @@ typedef struct {
 	uint8_t qos;
 } libmqtt_subscription;
 
+// User API
+
 int libmqtt_encodelength(uint8_t* buffer, size_t bufferlen, size_t len,
 		size_t* fieldlen);
 
@@ -79,6 +81,9 @@ int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 
 int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t id, uint8_t* returncodes, int numreturncodes);
+
+int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata,
+		uint16_t messageid);
 
 int libmqtt_construct_pingreq(libmqtt_writefunc writefunc, void* userdata);
 

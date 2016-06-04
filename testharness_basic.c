@@ -18,19 +18,14 @@ typedef enum {
 
 static int publishready(emcuetiti_clienthandle* client, size_t payloadlen);
 
-static emcuetiti_brokerhandle_callbacks brokerops = { .publishreadycallback =
-		publishready };
-
-static emcuetiti_brokerhandle broker = { .callbacks = &brokerops };
-
 static int publishready(emcuetiti_clienthandle* client, size_t payloadlen) {
-	printf("publish\n");
+	/*printf("publish\n");
 	uint8_t buff[64];
 
 	emcuetiti_client_readpublish(&broker, client, buff, payloadlen);
 	buff[payloadlen] = '\0';
 
-	printf("payload %s\n", buff);
+	printf("payload %s\n", buff);*/
 
 	return 0;
 }
@@ -118,6 +113,11 @@ static bool readytoread(void* userdata) {
 	return (state != FINISHED);
 }
 
+static emcuetiti_brokerhandle_callbacks brokerops = { .publishreadycallback =
+		publishready, .writefunc = connection_writefunc };
+
+static emcuetiti_brokerhandle broker = { .callbacks = &brokerops };
+
 int main(int argv, char** argc) {
 
 	printf("creating packets\n");
@@ -144,8 +144,8 @@ int main(int argv, char** argc) {
 
 	emcuetiti_topichandle topic;
 
-	emcuetiti_clientops ops = { .writefunc = connection_writefunc,
-			.readytoread = readytoread, .readfunc = readfunc };
+	emcuetiti_clientops ops =
+			{ .readytoread = readytoread, .readfunc = readfunc };
 
 	emcuetiti_clienthandle client = { .ops = &ops };
 

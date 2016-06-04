@@ -7,6 +7,8 @@
 #include "libmqtt.h"
 #include "emcuetiti_config.h"
 
+typedef struct emcuetiti_clienthandle emcuetiti_clienthandle;
+
 typedef int (*emcuetiti_writefunc)(void* userdata, uint8_t* buffer,
 		size_t offset, size_t len);
 typedef bool (*emcuetiti_readytoreadfunc)(void* userdata);
@@ -15,24 +17,32 @@ typedef int (*emcuetiti_readfunc)(void* userdata, uint8_t* buffer,
 typedef void (*emcuetiti_freefunc)(void* userdata);
 typedef int (*emcuetiti_allocfunc)(void* userdata, size_t size);
 
-typedef void (*emcuetiti_disconnectfunc)(void* userdata);
+typedef void (*emcuetiti_disconnectfunc)(emcuetiti_clienthandle* client,
+		void* userdata);
 
 typedef bool (*emcuetiti_isconnected)(void* userdata);
 
 typedef struct {
 	emcuetiti_isconnected isconnectedfunc;
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_WRITE
 	libmqtt_writefunc writefunc; // function pointer to the function used to write data to the client
+#endif
 	emcuetiti_readytoreadfunc readytoread;
 	emcuetiti_readfunc readfunc; // function pointer to the function user to read data from the client
+#if EMCUETITIT_CONFIG_CLIENTCALLBACKS_DISCONNECT
 	emcuetiti_disconnectfunc disconnectfunc; //
+#endif
 } emcuetiti_clientops;
 
-typedef struct {
-
+struct emcuetiti_clienthandle {
 	emcuetiti_clientops* ops;
 	void* userdata; // use this to stash whatever is needed to write/read the right client
 // in the write/read functions
-} emcuetiti_clienthandle;
+};
+
+typedef enum {
+	CLIENTSTATE_NEW, CLIENTSTATE_CONNECTED, CLIENTSTATE_DISCONNECTED
+} emcuetiti_clientconnectionstate;
 
 typedef enum {
 	CLIENTREADSTATE_IDLE,
@@ -64,6 +74,7 @@ typedef struct {
 	uint8_t buffer[EMCUETITI_CONFIG_CLIENTBUFFERSZ];
 	unsigned bufferpos;
 
+	emcuetiti_clientconnectionstate state;
 	emcuetiti_clientreadstate readstate;
 	uint8_t packettype;
 	size_t varheaderandpayloadlen;
@@ -84,6 +95,10 @@ typedef struct {
 	emcuetiti_publishreadyfunc publishreadycallback;
 	emcuetiti_authenticateclientfunc authenticatecallback;
 	emcuetiti_timstampfunc timestamp;
+
+	// client funcs
+	libmqtt_writefunc writefunc;
+	emcuetiti_disconnectfunc disconnectfunc;
 } emcuetiti_brokerhandle_callbacks;
 
 typedef struct {

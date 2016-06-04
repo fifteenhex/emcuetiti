@@ -14,3 +14,6 @@
 #define LIBMQTT_FLAGS_CONNECT_WILLRETAIN	(1 << 5)
 #define LIBMQTT_FLAGS_CONNECT_PASSWORDFLAG	(1 << 6)
 #define LIBMQTT_FLAGS_CONNECT_USERNAMEFLAG	(1 << 7)
+
+#define LIBMQTT_MSB(a) ((a >> 8) & 0xff)
+#define LIBMQTT_LSB(a) (a & 0xff)

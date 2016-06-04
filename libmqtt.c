@@ -273,8 +273,8 @@ int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t id, uint8_t* returncodes, int numreturncodes) {
 
-	libmqtt_messageid_variableheader varheader = { .packetidmsb = ((id >> 8)
-			& 0xff), .packetidlsb = (id & 0xff) };
+	libmqtt_messageid_variableheader varheader = { .packetidmsb = LIBMQTT_MSB(
+			id), .packetidlsb = LIBMQTT_LSB(id) };
 
 	uint8_t fixedheader[LIBMQTT_MAXIMUMFIXEDHEADERBYTES];
 	fixedheader[0] = LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_SUBACK, 0);
@@ -319,9 +319,11 @@ int libmqtt_construct_unsubscribe(libmqtt_writefunc writefunc, void* userdata,
 	return 0;
 }
 
-int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata) {
+int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata,
+		uint16_t messageid) {
 	return libmqtt_construct_genericack(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_UNSUBACK, 0), 0);
+			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_UNSUBACK, 0),
+			messageid);
 }
 
 int libmqtt_construct_pingreq(libmqtt_writefunc writefunc, void* userdata) {

@@ -49,12 +49,15 @@ static bool gsocket_isconnected(void* userdata) {
 	return g_socket_is_connected(socket);
 }
 
+void gsocket_disconnect(emcuetiti_clienthandle* client, void* userdata) {
+	GSocket* socket = (GSocket*) userdata;
+	g_socket_close(socket, NULL);
+}
+
 static emcuetiti_clientops gsocketclientops = { //
 		.isconnectedfunc = gsocket_isconnected, //
 				.readytoread = readytoread, //
-				.readfunc = gsocket_read, //
-				.writefunc = gsocket_write //
-		};
+				.readfunc = gsocket_read };
 
 static uint32_t timestamp() {
 	return 0;
@@ -63,7 +66,9 @@ static uint32_t timestamp() {
 static emcuetiti_brokerhandle_callbacks brokerops = { //
 		.authenticatecallback = NULL, //
 				.publishreadycallback = publishreadycallback, //
-				.timestamp = timestamp };
+				.timestamp = timestamp, //
+				.writefunc = gsocket_write, //
+				.disconnectfunc = gsocket_disconnect };
 
 int main(int argc, char** argv) {
 
