@@ -20,12 +20,12 @@ static int publishready(emcuetiti_clienthandle* client, size_t payloadlen);
 
 static int publishready(emcuetiti_clienthandle* client, size_t payloadlen) {
 	/*printf("publish\n");
-	uint8_t buff[64];
+	 uint8_t buff[64];
 
-	emcuetiti_client_readpublish(&broker, client, buff, payloadlen);
-	buff[payloadlen] = '\0';
+	 emcuetiti_client_readpublish(&broker, client, buff, payloadlen);
+	 buff[payloadlen] = '\0';
 
-	printf("payload %s\n", buff);*/
+	 printf("payload %s\n", buff);*/
 
 	return 0;
 }
@@ -149,16 +149,16 @@ int main(int argv, char** argc) {
 
 	emcuetiti_clienthandle client = { .ops = &ops };
 
-	emcuetiti_init(&broker);
-	emcuetiti_addtopicpart(&broker, NULL, &topic, "topic", true);
+	emcuetiti_broker_init(&broker);
+	emcuetiti_broker_addtopicpart(&broker, NULL, &topic, "topic", true);
 
 	emcuetiti_client_register(&broker, &client);
 
-	emcuetiti_dumpstate(&broker);
+	emcuetiti_broker_dumpstate(&broker);
 
 	printf("running test\n");
 	for (int i = 0; i < 25; i++)
-		emcuetiti_poll(&broker);
+		emcuetiti_broker_poll(&broker);
 
 	return 0;
 }

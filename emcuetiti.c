@@ -378,7 +378,7 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 
 }
 
-void emcuetiti_poll(emcuetiti_brokerhandle* broker) {
+void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 	EMCUETITI_CONFIG_TIMESTAMPTYPE now = broker->callbacks->timestamp();
 	if (broker->registeredclients > 0) {
 		for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
@@ -413,7 +413,7 @@ static emcuetiti_topichandle* emcuetiti_findparent(
 	return sibling;
 }
 
-void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
+void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
 		const char* topicpart, bool targetable) {
 
@@ -444,38 +444,38 @@ void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
 	}
 }
 
-void emcuetiti_init(emcuetiti_brokerhandle* broker) {
+void emcuetiti_broker_init(emcuetiti_brokerhandle* broker) {
 	// clear out state
 	broker->root = NULL;
 	broker->registeredclients = 0;
 	memset(broker->clients, 0, sizeof(broker->clients));
 }
 
-static void emcuetiti_dumpstate_printtopic(emcuetiti_topichandle* node) {
+static void emcuetiti_broker_dumpstate_printtopic(emcuetiti_topichandle* node) {
 	bool first = node->parent == NULL;
 	if (!first) {
-		emcuetiti_dumpstate_printtopic(node->parent);
+		emcuetiti_broker_dumpstate_printtopic(node->parent);
 		printf("/");
 	}
 
 	printf("%s", node->topicpart);
 }
 
-static void emcuetiti_dumpstate_child(emcuetiti_topichandle* node) {
+static void emcuetiti_broker_dumpstate_child(emcuetiti_topichandle* node) {
 	for (; node != NULL; node = node->sibling) {
 		if (node->child != NULL)
-			emcuetiti_dumpstate_child(node->child);
+			emcuetiti_broker_dumpstate_child(node->child);
 		else {
-			emcuetiti_dumpstate_printtopic(node);
+			emcuetiti_broker_dumpstate_printtopic(node);
 			printf("\n");
 		}
 	}
 }
 
-void emcuetiti_dumpstate(emcuetiti_brokerhandle* broker) {
+void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker) {
 	printf("--Topic hierachy--\n");
 	emcuetiti_topichandle* th = broker->root;
-	emcuetiti_dumpstate_child(th);
+	emcuetiti_broker_dumpstate_child(th);
 
 	printf("-- Clients --\n");
 	for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {

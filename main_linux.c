@@ -97,20 +97,21 @@ int main(int argc, char** argv) {
 		emcuetiti_topichandle topic2, topic2subtopic1, topic2subtopic2,
 				topic2subtopic2subtopic1;
 
-		emcuetiti_init(&broker);
+		emcuetiti_broker_init(&broker);
 
-		emcuetiti_addtopicpart(&broker, NULL, &topic1, "topic1", true);
-		emcuetiti_addtopicpart(&broker, &topic1, &subtopic1, "subtopic1", true);
+		emcuetiti_broker_addtopicpart(&broker, NULL, &topic1, "topic1", true);
+		emcuetiti_broker_addtopicpart(&broker, &topic1, &subtopic1, "subtopic1",
+		true);
 
-		emcuetiti_addtopicpart(&broker, NULL, &topic2, "topic2", true);
-		emcuetiti_addtopicpart(&broker, &topic2, &topic2subtopic1,
+		emcuetiti_broker_addtopicpart(&broker, NULL, &topic2, "topic2", true);
+		emcuetiti_broker_addtopicpart(&broker, &topic2, &topic2subtopic1,
 				"topic1subtopic2", true);
-		emcuetiti_addtopicpart(&broker, &topic2, &topic2subtopic2,
+		emcuetiti_broker_addtopicpart(&broker, &topic2, &topic2subtopic2,
 				"topic2subtopic2", true);
-		emcuetiti_addtopicpart(&broker, &topic2subtopic2,
+		emcuetiti_broker_addtopicpart(&broker, &topic2subtopic2,
 				&topic2subtopic2subtopic1, "subtopic2subtopic1", true);
 
-		emcuetiti_dumpstate(&broker);
+		emcuetiti_broker_dumpstate(&broker);
 
 		emcuetiti_client_router(&broker);
 
@@ -127,7 +128,7 @@ int main(int argc, char** argv) {
 
 			}
 
-			emcuetiti_poll(&broker);
+			emcuetiti_broker_poll(&broker);
 		}
 		g_socket_close(serversocket, NULL);
 	} else
