@@ -1,14 +1,21 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
 #include <stdbool.h>
 
-#include "libmqtt.h"
 #include "emcuetiti_config.h"
+#include "libmqtt.h"
+
+// forward typedefs
 
 typedef struct emcuetiti_clienthandle emcuetiti_clienthandle;
+typedef struct emcuetiti_clientstate emcuetiti_clientstate;
 
+// function prototypes
+
+typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_clienthandle* client,
+		size_t payloadlen);
+typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
+typedef bool (*emcuetiti_isconnected)(void* userdata);
 typedef int (*emcuetiti_writefunc)(void* userdata, uint8_t* buffer,
 		size_t offset, size_t len);
 typedef bool (*emcuetiti_readytoreadfunc)(void* userdata);
@@ -19,9 +26,18 @@ typedef int (*emcuetiti_allocfunc)(void* userdata, size_t size);
 
 typedef void (*emcuetiti_disconnectfunc)(emcuetiti_clienthandle* client,
 		void* userdata);
+typedef EMCUETITI_CONFIG_TIMESTAMPTYPE (*emcuetiti_timstampfunc)(void);
 
-typedef bool (*emcuetiti_isconnected)(void* userdata);
+// shared structures
+typedef struct emcuetiti_topichandle {
+	const char* topicpart;
+	struct emucutiti_topichandle* child;
+	struct emcuetiti_topichandle* sibling;
+	struct emcuetiti_topichandle* parent;
+	bool targetable;
+} emcuetiti_topichandle;
 
+// client structures
 typedef struct {
 	emcuetiti_isconnected isconnectedfunc;
 #if EMCUETITI_CONFIG_CLIENTCALLBACKS_WRITE
@@ -50,19 +66,10 @@ typedef enum {
 	CLIENTREADSTATE_REMAININGLEN,
 	CLIENTREADSTATE_PAYLOAD,
 	CLIENTREADSTATE_COMPLETE,
-
 	CLIENTREADSTATE_PUBLISHREADY
 } emcuetiti_clientreadstate;
 
-typedef struct emcuetiti_topichandle {
-	const char* topicpart;
-	struct emucutiti_topichandle* child;
-	struct emcuetiti_topichandle* sibling;
-	struct emcuetiti_topichandle* parent;
-	bool targetable;
-} emcuetiti_topichandle;
-
-typedef struct {
+struct emcuetiti_clientstate {
 	emcuetiti_clienthandle* client;
 	char clientid[LIBMQTT_CLIENTID_MAXLENGTH + 1];
 	uint16_t keepalive;
@@ -82,14 +89,16 @@ typedef struct {
 
 	emcuetiti_topichandle* publishtopic;
 	size_t publishpayloadlen;
-} emcuetiti_clientstate;
+};
 
-typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_clienthandle* client,
-		size_t payloadlen);
-
-typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
-
-typedef EMCUETITI_CONFIG_TIMESTAMPTYPE (*emcuetiti_timstampfunc)(void);
+// broker structures
+typedef struct {
+	emcuetiti_topichandle* topic;
+	emcuetiti_writefunc writefunc;
+	emcuetiti_readfunc readfunc;
+	emcuetiti_freefunc freefunc;
+	void* userdata;
+} emcuetiti_publish;
 
 typedef struct {
 	emcuetiti_publishreadyfunc publishreadycallback;
@@ -107,32 +116,3 @@ typedef struct {
 	emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
 	emcuetiti_brokerhandle_callbacks* callbacks;
 } emcuetiti_brokerhandle;
-
-typedef struct {
-	emcuetiti_topichandle* topic;
-	emcuetiti_writefunc writefunc;
-	emcuetiti_readfunc readfunc;
-	emcuetiti_freefunc freefunc;
-	void* userdata;
-} emcuetiti_publish;
-
-// These functions are to be driven by the code running on the broker
-// to publish to clients
-void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
-		emcuetiti_publish* publish);
-
-//
-void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* handle);
-void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* handle);
-int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* client, uint8_t* buffer, size_t len);
-
-//
-void emcuetiti_poll(emcuetiti_brokerhandle* broker);
-void emcuetiti_addtopicpart(emcuetiti_brokerhandle* broker,
-		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
-		const char* topicpart, bool targetable);
-void emcuetiti_init(emcuetiti_brokerhandle* broker);
-void emcuetiti_dumpstate(emcuetiti_brokerhandle* broker);

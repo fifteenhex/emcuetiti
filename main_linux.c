@@ -1,7 +1,9 @@
 #include <gio/gio.h>
 #include <stdio.h>
 #include <stdbool.h>
+
 #include "emcuetiti.h"
+#include "emcuetiti_port_router.h"
 
 emcuetiti_brokerhandle broker;
 static int publishreadycallback(emcuetiti_clienthandle* client,
@@ -109,6 +111,8 @@ int main(int argc, char** argv) {
 				&topic2subtopic2subtopic1, "subtopic2subtopic1", true);
 
 		emcuetiti_dumpstate(&broker);
+
+		emcuetiti_client_router(&broker);
 
 		while (true) {
 			GSocket* clientsocket = g_socket_accept(serversocket, NULL, NULL);
