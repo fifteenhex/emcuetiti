@@ -53,15 +53,21 @@ void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle) {
 	if (broker->registeredclients > 0) {
-		broker->registeredclients--;
+		bool unregistered = false;
 		for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
-			if (broker->clients[i].client == handle) {
-				emcuetiti_clientstate* cs = broker->clients + i;
-
+			emcuetiti_clientstate* cs = &(broker->clients[i]);
+			if (cs->client == handle) {
 				// clear the client and it's subscriptions
 				cs->client = NULL;
+				unregistered = true;
 				break;
 			}
+		}
+
+		if (unregistered) {
+			broker->registeredclients--;
+			printf("unregistered client, %d clients left\n",
+					broker->registeredclients);
 		}
 	}
 }
@@ -203,11 +209,11 @@ static void emcuetiti_disconnectclient(emcuetiti_brokerhandle* broker,
 		emcuetiti_clientstate* cs) {
 #if EMCUETITI_CONFIG_PERCLIENTCALLBACK_DISCONNECT
 	if (cs->client->ops->disconnectfunc != NULL)
-	cs->client->ops->disconnectfunc(cs->client, cs->client->userdata);
+	cs->client->ops->disconnectfunc(broker, cs->client);
 	else {
 #endif
 	if (broker->callbacks->disconnectfunc != NULL) {
-		broker->callbacks->disconnectfunc(cs->client, cs->client->userdata);
+		broker->callbacks->disconnectfunc(broker, cs->client);
 	}
 #if EMCUETITI_CONFIG_PERCLIENTCALLBACK_DISCONNECT
 }
@@ -460,8 +466,8 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 
 	printf("finished\n");
 
-	//if (publish->freefunc != NULL)
-	//	publish->freefunc(publish->userdata);
+//if (publish->freefunc != NULL)
+//	publish->freefunc(publish->userdata);
 }
 
 static emcuetiti_topichandle* emcuetiti_findparent(

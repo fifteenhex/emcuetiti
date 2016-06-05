@@ -27,8 +27,9 @@ typedef void (*emcuetiti_freefunc)(void* userdata);
 typedef int (*emcuetiti_allocfunc)(void* userdata, size_t size);
 typedef void (*emcuetiti_resetfunc)(void* userdata);
 
-typedef void (*emcuetiti_disconnectfunc)(emcuetiti_clienthandle* client,
-		void* userdata);
+typedef void (*emcuetiti_disconnectfunc)(emcuetiti_brokerhandle* broker,
+		emcuetiti_clienthandle* client);
+
 typedef EMCUETITI_CONFIG_TIMESTAMPTYPE (*emcuetiti_timstampfunc)(void);
 
 // shared structures

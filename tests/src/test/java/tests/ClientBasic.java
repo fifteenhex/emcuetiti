@@ -10,24 +10,6 @@ import java.util.concurrent.TimeUnit;
 
 public class ClientBasic extends BaseMQTTTest {
 
-    private static final String TOPIC = "/topic1";
-
-    private void subscribeToTopic(final BlockingConnection mqttConnection, final String topic) {
-        try {
-            Topic[] topics = new Topic[]{new Topic(topic, QoS.AT_LEAST_ONCE)};
-            mqttConnection.subscribe(topics);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void unsubFromTopic(final BlockingConnection mqttConnection, final String topic) {
-        try {
-            mqttConnection.unsubscribe(new String[]{topic});
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     @Test
     public void subscribeAndUnsubscribe() {

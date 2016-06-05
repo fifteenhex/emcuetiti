@@ -40,9 +40,12 @@ static bool gsocket_isconnected(void* userdata) {
 	return g_socket_is_connected(socket);
 }
 
-void gsocket_disconnect(emcuetiti_clienthandle* client, void* userdata) {
-	GSocket* socket = (GSocket*) userdata;
+void gsocket_disconnect(emcuetiti_brokerhandle* broker,
+		emcuetiti_clienthandle* client) {
+	emcuetiti_client_unregister(broker, client);
+	GSocket* socket = (GSocket*) client->userdata;
 	g_socket_close(socket, NULL);
+	g_free(client);
 }
 
 static emcuetiti_clientops gsocketclientops = { //
