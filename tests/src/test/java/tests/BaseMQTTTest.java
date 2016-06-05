@@ -48,6 +48,7 @@ public class BaseMQTTTest {
         try {
             mqttClient.setHost(MQTT_HOSTNAME, MQTT_PORT);
             mqttClient.setConnectAttemptsMax(1);
+            mqttClient.setReconnectAttemptsMax(0);
         } catch (URISyntaxException e) {
             e.printStackTrace();
             throw new RuntimeException(e);

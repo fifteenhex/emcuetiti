@@ -101,9 +101,20 @@ int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
 
 static void emcuetiti_poll_read(emcuetiti_clientstate* cs,
 EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
+
+	int bufferremaining = EMCUETITI_CONFIG_CLIENTBUFFERSZ - cs->bufferpos;
+
+	if (bufferremaining == 0) {
+		printf("client buffer is full\n");
+		return;
+	}
+
 	uint8_t* offsetbuffer = cs->buffer + cs->bufferpos;
 	void* userdata = cs->client->userdata;
 	int read;
+
+	emcuetiti_readfunc readfunc = cs->client->ops->readfunc;
+
 	switch (cs->readstate) {
 	case CLIENTREADSTATE_IDLE:
 		if (cs->client->ops->readytoread(cs->client->userdata)) {
@@ -112,12 +123,12 @@ EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
 		}
 		break;
 	case CLIENTREADSTATE_TYPE:
-		if (cs->client->ops->readfunc(userdata, &(cs->packettype), 1) == 1) {
+		if (readfunc(userdata, &(cs->packettype), 1) == 1) {
 			cs->readstate = CLIENTREADSTATE_REMAININGLEN;
 		}
 		break;
 	case CLIENTREADSTATE_REMAININGLEN:
-		if (cs->client->ops->readfunc(userdata, offsetbuffer, 1) == 1) {
+		if (readfunc(userdata, offsetbuffer, 1) == 1) {
 			if ((*offsetbuffer & (1 << 7)) == 0) {
 				libmqtt_decodelength(cs->buffer, &cs->varheaderandpayloadlen);
 				if (cs->varheaderandpayloadlen > 0) {
@@ -125,18 +136,23 @@ EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
 					cs->remainingbytes = cs->varheaderandpayloadlen;
 				} else
 					cs->readstate = CLIENTREADSTATE_COMPLETE;
+
+				// length is stashed, reset buffer
+				cs->bufferpos = 0;
 			}
-			cs->bufferpos = 0;
 		}
 		break;
 	case CLIENTREADSTATE_PAYLOAD:
-		read = cs->client->ops->readfunc(userdata, offsetbuffer,
-				cs->remainingbytes);
-		if (read > 0) {
-			cs->remainingbytes -= read;
-			if (cs->remainingbytes == 0) {
-				cs->readstate = CLIENTREADSTATE_COMPLETE;
-				cs->lastseen = now;
+		if (cs->remainingbytes > bufferremaining) {
+			printf("not enough space in buffer for remaining bytes\n");
+		} else {
+			read = readfunc(userdata, offsetbuffer, cs->remainingbytes);
+			if (read > 0) {
+				cs->remainingbytes -= read;
+				if (cs->remainingbytes == 0) {
+					cs->readstate = CLIENTREADSTATE_COMPLETE;
+					cs->lastseen = now;
+				}
 			}
 		}
 		break;
@@ -340,7 +356,12 @@ static void emcuetiti_handleinboundpacket_subscribe(
 	printf("sub from %s, messageid %d, qos %d\n", cs->clientid, (int) messageid,
 			(int) qos);
 
-	if (t == NULL) {
+	bool qosisvalid = qos >= LIBMQTT_QOS0_ATMOSTONCE
+			&& qos <= LIBMQTT_QOS2_EXACTLYONCE;
+	if (!qosisvalid)
+		printf("client %s requested invalid qos in subreq\n", cs->clientid);
+
+	if (!qosisvalid || t == NULL) {
 		printf("client tried to sub to nonexisting topic\n");
 		returncodes[0] = LIBMQTT_SUBSCRIBERETURNCODE_FAILURE;
 	} else {
@@ -364,10 +385,7 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 			buffer, &topiclen);
 	buffer += 2 + topiclen;
 
-	uint8_t qos = *(buffer++);
-
-	printf("unsub from %s, messageid %d, qos %d\n", cs->clientid,
-			(int) messageid, (int) qos);
+	printf("unsub from %s, messageid %d\n", cs->clientid, (int) messageid);
 
 	if (t == NULL) {
 		printf("client tried to unsub from nonexisting topic\n");
@@ -577,12 +595,19 @@ static void emcuetiti_broker_dumpstate_child(emcuetiti_topichandle* node) {
 }
 
 void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker) {
-	printf("--Topic hierachy--\n");
+	printf("-- Topic hierachy --\n");
 	emcuetiti_topichandle* th = broker->root;
 	emcuetiti_broker_dumpstate_child(th);
 
 	printf("-- Clients --\n");
 	for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
-
+		emcuetiti_clientstate* cs = &(broker->clients[i]);
+		if (cs->client != NULL)
+			printf("%s\t%d\t%d\n", cs->clientid, (int) cs->state,
+					(int) cs->readstate);
 	}
+}
+
+bool emcuetiti_broker_canacceptmoreclients(emcuetiti_brokerhandle* broker) {
+	return broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS;
 }

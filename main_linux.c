@@ -111,19 +111,29 @@ int main(int argc, char** argv) {
 		emcuetiti_port_router(&broker, &routerport);
 
 		while (true) {
+			static int loop = 0;
 			GSocket* clientsocket = g_socket_accept(serversocket, NULL, NULL);
 			if (clientsocket != NULL) {
-				g_message("incoming connection");
-				emcuetiti_clienthandle* client = g_malloc(
-						sizeof(emcuetiti_clienthandle));
+				if (emcuetiti_broker_canacceptmoreclients(&broker)) {
+					g_message("incoming connection");
+					emcuetiti_clienthandle* client = g_malloc(
+							sizeof(emcuetiti_clienthandle));
 
-				client->userdata = clientsocket;
-				client->ops = &gsocketclientops;
-				emcuetiti_client_register(&broker, client);
-
+					client->userdata = clientsocket;
+					client->ops = &gsocketclientops;
+					emcuetiti_client_register(&broker, client);
+				} else {
+					g_message(
+							"cannot accept any more clients, disconnecting client");
+					g_socket_close(clientsocket, NULL);
+				}
 			}
 
 			emcuetiti_broker_poll(&broker);
+			loop++;
+			if ((loop % 10) == 0)
+				emcuetiti_broker_dumpstate(&broker);
+			g_usleep(1000000);
 		}
 		g_socket_close(serversocket, NULL);
 	} else

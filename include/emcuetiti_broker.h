@@ -11,3 +11,4 @@ void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker);
 
 void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 		emcuetiti_publish* publish);
+bool emcuetiti_broker_canacceptmoreclients(emcuetiti_brokerhandle* broker);
