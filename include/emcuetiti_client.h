@@ -2,7 +2,6 @@
 
 #include "emcuetiti_types.h"
 
-// client functions
 void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle);
 void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,

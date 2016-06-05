@@ -5,13 +5,6 @@
 #include "emcuetiti.h"
 #include "testutils.h"
 
-typedef struct {
-	uint8_t* buffer;
-	size_t len;
-	size_t writepos;
-	size_t readpos;
-} bufferholder;
-
 typedef enum {
 	CONNECT, SUBSCRIBE, PUBLISH, FINISHED
 } teststate;

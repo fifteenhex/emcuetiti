@@ -8,3 +8,6 @@ void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 		const char* topicpart, bool targetable);
 void emcuetiti_broker_init(emcuetiti_brokerhandle* broker);
 void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker);
+
+void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
+		emcuetiti_publish* publish);

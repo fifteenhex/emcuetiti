@@ -24,6 +24,5 @@ It's then up to the port to decide how to handle the publish.
 Ports could be used to implement:
 
 -	An interface to drive your local application logic from publishes coming into the broker
--	An MQTT client that passes messages local messages to a remote broker and passes messages 
-	from a remote broker into the local broker
+-	An MQTT client that passes messages local messages to a remote broker
 -	client->client routing like a standard broker.

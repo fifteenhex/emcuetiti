@@ -6,17 +6,6 @@
 #include "emcuetiti_port_router.h"
 
 emcuetiti_brokerhandle broker;
-static int publishreadycallback(emcuetiti_clienthandle* client,
-		size_t publishlen) {
-	printf("publish ready\n");
-	uint8_t* buffer = g_malloc(publishlen + 1);
-	int read = emcuetiti_client_readpublish(&broker, client, buffer,
-			publishlen);
-	buffer[read] = '\0';
-	printf("publish %s\n", (char *) buffer);
-	g_free(buffer);
-	return 0;
-}
 
 /*
  typedef int (*emcuetiti_writefunc)(void* userdata, uint8_t* buffer,
@@ -33,14 +22,14 @@ bool readytoread(void* userdata) {
 	return g_socket_condition_check(socket, G_IO_IN) == G_IO_IN;
 }
 
-int gsocket_read(void* userdata, uint8_t* buffer, size_t offset, size_t len) {
+int gsocket_read(void* userdata, uint8_t* buffer, size_t len) {
 	GSocket* socket = (GSocket*) userdata;
 	int ret = g_socket_receive(socket, buffer, len, NULL, NULL);
 	return ret;
 
 }
 
-int gsocket_write(void* userdata, uint8_t* buffer, size_t len) {
+int gsocket_write(void* userdata, const uint8_t* buffer, size_t len) {
 	GSocket* socket = (GSocket*) userdata;
 	int ret = g_socket_send(socket, buffer, len, NULL, NULL);
 	return ret;
@@ -67,7 +56,6 @@ static uint32_t timestamp() {
 
 static emcuetiti_brokerhandle_callbacks brokerops = { //
 		.authenticatecallback = NULL, //
-				.publishreadycallback = publishreadycallback, //
 				.timestamp = timestamp, //
 				.writefunc = gsocket_write, //
 				.disconnectfunc = gsocket_disconnect };
@@ -113,7 +101,8 @@ int main(int argc, char** argv) {
 
 		emcuetiti_broker_dumpstate(&broker);
 
-		emcuetiti_client_router(&broker);
+		emcuetiti_porthandle routerport;
+		emcuetiti_port_router(&broker, &routerport);
 
 		while (true) {
 			GSocket* clientsocket = g_socket_accept(serversocket, NULL, NULL);

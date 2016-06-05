@@ -3,8 +3,14 @@
 #include <stdbool.h>
 
 #define EMCUETITI_CONFIG_DEBUG				true
+
+// config for ports
+#define EMCUETITI_CONFIG_MAXPORTS			4
+
+// config for clients
 #define EMCUETITI_CONFIG_MAXCLIENTS			4
 #define EMCUETITI_CONFIG_MAXSUBSPERCLIENT	4
+
 #define EMCUETITI_CONFIG_CLIENTBUFFERSZ		64
 
 #define EMCUETITI_CONFIG_TIMESTAMPTYPE		uint32_t

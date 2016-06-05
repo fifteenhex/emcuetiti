@@ -1,5 +1,6 @@
 #pragma once
 
-#include "emcuetiti.h"
+#include "emcuetiti_port.h"
 
-void emcuetiti_client_router(emcuetiti_brokerhandle* broker);
+void emcuetiti_port_router(emcuetiti_brokerhandle* broker,
+		emcuetiti_porthandle* port);

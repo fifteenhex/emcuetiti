@@ -14,6 +14,25 @@ static size_t min(size_t a, size_t b) {
 		return b;
 }
 
+void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
+		emcuetiti_porthandle* port) {
+
+	bool registered = false;
+
+	for (int i = 0; i < ARRAY_ELEMENTS(broker->ports); i++) {
+		if (broker->ports[i] == NULL) {
+			broker->ports[i] = port;
+			registered = true;
+			break;
+		}
+	}
+
+	if (registered)
+		printf("port registered\n");
+	else
+		printf("failed to register port\n");
+}
+
 void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle) {
 	if (broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS) {
@@ -78,12 +97,12 @@ static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 		}
 		break;
 	case CLIENTREADSTATE_TYPE:
-		if (cs->client->ops->readfunc(userdata, &(cs->packettype), 0, 1) == 1) {
+		if (cs->client->ops->readfunc(userdata, &(cs->packettype), 1) == 1) {
 			cs->readstate = CLIENTREADSTATE_REMAININGLEN;
 		}
 		break;
 	case CLIENTREADSTATE_REMAININGLEN:
-		if (cs->client->ops->readfunc(userdata, offsetbuffer, 0, 1) == 1) {
+		if (cs->client->ops->readfunc(userdata, offsetbuffer, 1) == 1) {
 			if ((*offsetbuffer & (1 << 7)) == 0) {
 				libmqtt_decodelength(cs->buffer, &cs->varheaderandpayloadlen);
 				if (cs->varheaderandpayloadlen > 0) {
@@ -96,7 +115,7 @@ static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 		}
 		break;
 	case CLIENTREADSTATE_PAYLOAD:
-		read = cs->client->ops->readfunc(userdata, offsetbuffer, 0,
+		read = cs->client->ops->readfunc(userdata, offsetbuffer,
 				cs->remainingbytes);
 		if (read > 0) {
 			cs->remainingbytes -= read;
@@ -222,9 +241,14 @@ static void emcuetiti_handleinboundpacket_publish(
 			cs->bufferpos += 2;
 		}
 
-		if (broker->callbacks->publishreadycallback != NULL)
-			broker->callbacks->publishreadycallback(cs->client,
-					cs->publishpayloadlen);
+		for (int p = 0; p < ARRAY_ELEMENTS(broker->ports); p++) {
+			if (broker->ports[p] != NULL) {
+				printf("dispatching publish to port %d\n", p);
+				if (broker->ports[p]->publishreadycallback != NULL)
+					broker->ports[p]->publishreadycallback(broker, cs->client,
+							cs->publishpayloadlen);
+			}
+		}
 
 		if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
 			libmqtt_construct_puback(emcuetiti_resolvewritefunc(broker, cs),
@@ -277,6 +301,7 @@ static void emcuetiti_handleinboardpacket_connect(
 		libmqtt_construct_connack(emcuetiti_resolvewritefunc(broker, cs),
 				userdata);
 	}
+	cs->state = CLIENTSTATE_CONNECTED;
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
@@ -402,6 +427,43 @@ void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 	}
 }
 
+void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
+		emcuetiti_publish* publish) {
+
+	printf("outgoing publish\n");
+
+	for (int c = 0; c < ARRAY_ELEMENTS(broker->clients); c++) {
+
+		emcuetiti_clientstate* cs = &broker->clients[c];
+
+		if (cs->state == CLIENTSTATE_CONNECTED) {
+
+			printf("sending publish to %s\n", cs->clientid);
+
+			libmqtt_writefunc clientwritefunc = emcuetiti_resolvewritefunc(
+					broker, &broker->clients[c]);
+
+			libmqtt_construct_publish(clientwritefunc, //
+					broker->clients[c].client->userdata, //
+					publish->readfunc, //
+					publish->userdata, //
+					"/topic1", //
+					publish->payloadln, //
+					LIBMQTT_QOS0_ATMOSTONCE, //
+					false, //
+					false, 0);
+
+			if (publish->resetfunc != NULL)
+				publish->resetfunc(publish->userdata);
+		}
+	}
+
+	printf("finished\n");
+
+	//if (publish->freefunc != NULL)
+	//	publish->freefunc(publish->userdata);
+}
+
 static emcuetiti_topichandle* emcuetiti_findparent(
 		emcuetiti_topichandle* sibling) {
 	for (; sibling->sibling != NULL; sibling = sibling->sibling) {
@@ -417,7 +479,7 @@ void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
 		const char* topicpart, bool targetable) {
 
-	// clear pointers
+// clear pointers
 	part->sibling = NULL;
 	part->child = NULL;
 	part->parent = NULL;
@@ -445,9 +507,10 @@ void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 }
 
 void emcuetiti_broker_init(emcuetiti_brokerhandle* broker) {
-	// clear out state
+// clear out state
 	broker->root = NULL;
 	broker->registeredclients = 0;
+	memset(broker->ports, 0, sizeof(broker->ports));
 	memset(broker->clients, 0, sizeof(broker->clients));
 }
 

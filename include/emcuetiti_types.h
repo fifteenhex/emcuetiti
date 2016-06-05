@@ -9,20 +9,23 @@
 
 typedef struct emcuetiti_clienthandle emcuetiti_clienthandle;
 typedef struct emcuetiti_clientstate emcuetiti_clientstate;
+typedef struct emcuetiti_brokerhandle emcuetiti_brokerhandle;
 
 // function prototypes
 
-typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_clienthandle* client,
-		size_t payloadlen);
+typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_brokerhandle* broker,
+		emcuetiti_clienthandle* client, size_t payloadlen);
 typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
 typedef bool (*emcuetiti_isconnected)(void* userdata);
-typedef int (*emcuetiti_writefunc)(void* userdata, uint8_t* buffer,
-		size_t offset, size_t len);
+
 typedef bool (*emcuetiti_readytoreadfunc)(void* userdata);
-typedef int (*emcuetiti_readfunc)(void* userdata, uint8_t* buffer,
-		size_t offset, size_t len);
+
+typedef libmqtt_writefunc emcuetiti_writefunc;
+typedef libmqtt_readfunc emcuetiti_readfunc;
+
 typedef void (*emcuetiti_freefunc)(void* userdata);
 typedef int (*emcuetiti_allocfunc)(void* userdata, size_t size);
+typedef void (*emcuetiti_resetfunc)(void* userdata);
 
 typedef void (*emcuetiti_disconnectfunc)(emcuetiti_clienthandle* client,
 		void* userdata);
@@ -90,6 +93,11 @@ struct emcuetiti_clientstate {
 	emcuetiti_topichandle* publishtopic;
 	size_t publishpayloadlen;
 };
+// port structures
+
+typedef struct {
+	emcuetiti_publishreadyfunc publishreadycallback;
+} emcuetiti_porthandle;
 
 // broker structures
 typedef struct {
@@ -97,11 +105,19 @@ typedef struct {
 	emcuetiti_writefunc writefunc;
 	emcuetiti_readfunc readfunc;
 	emcuetiti_freefunc freefunc;
+	emcuetiti_resetfunc resetfunc;
 	void* userdata;
+	size_t payloadln;
 } emcuetiti_publish;
 
 typedef struct {
-	emcuetiti_publishreadyfunc publishreadycallback;
+	uint8_t* buffer;
+	size_t len;
+	size_t writepos;
+	size_t readpos;
+} emcuetiti_bufferholder;
+
+typedef struct {
 	emcuetiti_authenticateclientfunc authenticatecallback;
 	emcuetiti_timstampfunc timestamp;
 
@@ -110,9 +126,10 @@ typedef struct {
 	emcuetiti_disconnectfunc disconnectfunc;
 } emcuetiti_brokerhandle_callbacks;
 
-typedef struct {
+struct emcuetiti_brokerhandle {
 	unsigned registeredclients;
 	emcuetiti_topichandle* root;
+	emcuetiti_porthandle* ports[EMCUETITI_CONFIG_MAXPORTS];
 	emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
 	emcuetiti_brokerhandle_callbacks* callbacks;
-} emcuetiti_brokerhandle;
+};

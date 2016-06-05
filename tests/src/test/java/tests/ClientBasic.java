@@ -43,12 +43,17 @@ public class ClientBasic extends BaseMQTTTest {
 
         subscribeToTopic(listener, TOPIC);
 
+        String payloadOut = "Hello";
+
         try {
-            publisher.publish(TOPIC, "Hello".getBytes(), QoS.AT_MOST_ONCE, false);
+            publisher.publish(TOPIC, payloadOut.getBytes(), QoS.AT_MOST_ONCE, false);
 
             Message receivedPublish = listener.receive(10, TimeUnit.SECONDS);
             assert (receivedPublish != null);
 
+            String payloadIn = new String(receivedPublish.getPayload(), "UTF-8");
+
+            assert (payloadIn.equals(payloadOut));
 
         } catch (Exception e) {
             throw new RuntimeException(e);
