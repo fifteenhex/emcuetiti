@@ -25,6 +25,8 @@ bool readytoread(void* userdata) {
 int gsocket_read(void* userdata, uint8_t* buffer, size_t len) {
 	GSocket* socket = (GSocket*) userdata;
 	int ret = g_socket_receive(socket, buffer, len, NULL, NULL);
+	if (ret != len)
+		printf("wanted %d, read %d\n", len, ret);
 	return ret;
 
 }
@@ -54,7 +56,8 @@ static emcuetiti_clientops gsocketclientops = { //
 				.readfunc = gsocket_read };
 
 static uint32_t timestamp() {
-	return 0;
+	gint64 now = g_get_monotonic_time() / 1000000;
+	return (uint32_t) now;
 }
 
 static emcuetiti_brokerhandle_callbacks brokerops = { //

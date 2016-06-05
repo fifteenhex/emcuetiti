@@ -35,8 +35,8 @@ void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
 
 void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle) {
+	bool registered = false;
 	if (broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS) {
-		broker->registeredclients++;
 		// search for a free slot to put this client
 		for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
 			if (broker->clients[i].client == NULL) {
@@ -44,9 +44,17 @@ void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 				cs->client = handle;
 				cs->state = CLIENTSTATE_NEW;
 				cs->readstate = CLIENTREADSTATE_IDLE;
+				cs->lastseen = broker->callbacks->timestamp();
+				registered = true;
 				break;
 			}
 		}
+	}
+
+	if (registered) {
+		broker->registeredclients++;
+		printf("registered client, now have %d clients\n",
+				broker->registeredclients);
 	}
 }
 
@@ -91,7 +99,8 @@ int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
 	return len;
 }
 
-static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
+static void emcuetiti_poll_read(emcuetiti_clientstate* cs,
+EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
 	uint8_t* offsetbuffer = cs->buffer + cs->bufferpos;
 	void* userdata = cs->client->userdata;
 	int read;
@@ -125,8 +134,10 @@ static void emcuetiti_poll_read(emcuetiti_clientstate* cs) {
 				cs->remainingbytes);
 		if (read > 0) {
 			cs->remainingbytes -= read;
-			if (cs->remainingbytes == 0)
+			if (cs->remainingbytes == 0) {
 				cs->readstate = CLIENTREADSTATE_COMPLETE;
+				cs->lastseen = now;
+			}
 		}
 		break;
 	}
@@ -409,6 +420,27 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 
 }
 
+static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* client, EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
+
+	uint16_t keepalive = EMCUETITI_CONFIG_DEFAULTKEEPALIVE;
+	if (client->keepalive != 0)
+		keepalive = client->keepalive;
+
+	EMCUETITI_CONFIG_TIMESTAMPTYPE expires = client->lastseen + keepalive;
+
+	if (expires > now) {
+		EMCUETITI_CONFIG_TIMESTAMPTYPE timebeforeexpiry = expires - now;
+#if EMCUETITI_CONFIG_DEBUG_KEEPALIVE
+		printf("client %s expires in %ds\n", client->clientid,
+				timebeforeexpiry);
+#endif
+	} else {
+		printf("client %s has expired\n", client->clientid);
+		emcuetiti_disconnectclient(broker, client);
+	}
+}
+
 void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 	EMCUETITI_CONFIG_TIMESTAMPTYPE now = broker->callbacks->timestamp();
 	if (broker->registeredclients > 0) {
@@ -420,12 +452,15 @@ void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 				case CLIENTSTATE_CONNECTED:
 					if (cs->client->ops->isconnectedfunc(
 							cs->client->userdata)) {
-						emcuetiti_poll_read(cs);
+						emcuetiti_poll_read(cs, now);
+
+						emcuetiti_broker_poll_checkkeepalive(broker, cs, now);
+
 						if (cs->readstate == CLIENTREADSTATE_COMPLETE)
 							emcuetiti_handleinboundpacket(broker, cs);
-					} else {
-						printf("client %s disconnected\n", cs->clientid);
-					}
+					} else
+						emcuetiti_disconnectclient(broker, cs);
+
 					break;
 				}
 			}

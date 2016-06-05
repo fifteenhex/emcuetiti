@@ -6,8 +6,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 public class TortureTest extends BaseMQTTTest {
-
-    @Ignore
+    
     @Test
     public void subscribeAndUnsubscribeTorture() {
         BlockingConnection mqttConnection = mqttConnections[0];
