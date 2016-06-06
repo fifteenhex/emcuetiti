@@ -141,9 +141,11 @@ EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
 				} else
 					cs->readstate = CLIENTREADSTATE_COMPLETE;
 
+				printf("%d bytes remaining\n", cs->remainingbytes);
 				// length is stashed, reset buffer
 				cs->bufferpos = 0;
-			}
+			} else
+				cs->bufferpos++;
 		}
 		break;
 	case CLIENTREADSTATE_PAYLOAD:

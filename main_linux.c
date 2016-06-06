@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
 		emcuetiti_port_router(&broker, &routerport);
 
 		while (true) {
-			static int loop = 0;
+			//static int loop = 0;
 			GSocket* clientsocket = g_socket_accept(serversocket, NULL, NULL);
 			if (clientsocket != NULL) {
 				if (emcuetiti_broker_canacceptmoreclients(&broker)) {
@@ -130,10 +130,10 @@ int main(int argc, char** argv) {
 			}
 
 			emcuetiti_broker_poll(&broker);
-			loop++;
-			if ((loop % 100) == 0)
-				emcuetiti_broker_dumpstate(&broker);
-			g_usleep(50000);
+			//loop++;
+			//if ((loop % 100) == 0)
+			//	emcuetiti_broker_dumpstate(&broker);
+			g_usleep(5000);
 		}
 		g_socket_close(serversocket, NULL);
 	} else

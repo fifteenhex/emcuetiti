@@ -72,15 +72,17 @@ int libmqtt_encodelength(uint8_t* buffer, size_t bufferlen, size_t len,
 }
 
 int libmqtt_decodelength(uint8_t* buffer, size_t* len) {
+	static const uint8_t continuationmask = (1 << 7);
+
 	size_t tmp = 0;
 	uint8_t byte;
 	unsigned multiplier = 1;
 
 	do {
 		byte = *(buffer++);
-		tmp += (byte & ~(1 << 7)) * multiplier;
+		tmp += (byte & ~continuationmask) * multiplier;
 		multiplier *= 128;
-	} while ((byte & (1 << 7)) != 0);
+	} while ((byte & continuationmask) != 0);
 
 	*len = tmp;
 
