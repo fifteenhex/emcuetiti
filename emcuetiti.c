@@ -45,6 +45,10 @@ void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 				cs->state = CLIENTSTATE_NEW;
 				cs->readstate = CLIENTREADSTATE_IDLE;
 				cs->lastseen = broker->callbacks->timestamp();
+
+				memset(cs->subscriptions, 0, sizeof(cs->subscriptions));
+				cs->numsubscriptions = 0;
+
 				registered = true;
 				break;
 			}
@@ -341,7 +345,7 @@ static void emcuetiti_handleinboardpacket_connect(
 static void emcuetiti_handleinboundpacket_subscribe(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	void* userdata = cs->client->userdata;
-	uint8_t returncodes[] = { 0 };
+	uint8_t returncodes[] = { LIBMQTT_SUBSCRIBERETURNCODE_FAILURE };
 
 	uint8_t* buffer = cs->buffer;
 	uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
@@ -361,15 +365,21 @@ static void emcuetiti_handleinboundpacket_subscribe(
 	if (!qosisvalid)
 		printf("client %s requested invalid qos in subreq\n", cs->clientid);
 
-	if (!qosisvalid || t == NULL) {
-		printf("client tried to sub to nonexisting topic\n");
-		returncodes[0] = LIBMQTT_SUBSCRIBERETURNCODE_FAILURE;
-	} else {
-		cs->subscriptions[cs->numsubscriptions++] = t;
+	if (qosisvalid && t != NULL) {
+		bool added = false;
+		for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
+			if (cs->subscriptions[i] == NULL) {
+				cs->subscriptions[i] = t;
+				cs->numsubscriptions++;
+				returncodes[0] = 0;
+				break;
+			}
+		}
 	}
 
 	libmqtt_construct_suback(emcuetiti_resolvewritefunc(broker, cs), userdata,
 			messageid, returncodes, 1);
+
 	cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
@@ -390,7 +400,14 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 	if (t == NULL) {
 		printf("client tried to unsub from nonexisting topic\n");
 	} else {
-		//cs->subscriptions[cs->numsubscriptions++] = t;
+
+		for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
+			if (cs->subscriptions[i] == t) {
+				cs->subscriptions[i] = NULL;
+				cs->numsubscriptions--;
+				break;
+			}
+		}
 	}
 
 	libmqtt_construct_unsuback(emcuetiti_resolvewritefunc(broker, cs), userdata,
@@ -439,7 +456,8 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 }
 
 static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
-		emcuetiti_clientstate* client, EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
+		emcuetiti_clientstate* client,
+		EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
 
 	uint16_t keepalive = EMCUETITI_CONFIG_DEFAULTKEEPALIVE;
 	if (client->keepalive != 0)
@@ -594,6 +612,27 @@ static void emcuetiti_broker_dumpstate_child(emcuetiti_topichandle* node) {
 	}
 }
 
+void emcuetiti_broker_dumpstate_client(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* client) {
+
+	char* state = "invalid";
+	switch (client->state) {
+	case CLIENTSTATE_NEW:
+		state = "new";
+		break;
+	case CLIENTSTATE_CONNECTED:
+		state = "connected";
+		break;
+	case CLIENTSTATE_DISCONNECTED:
+		state = "disconnected";
+		break;
+	}
+
+	if (client->client != NULL)
+		printf("%s\t%s\t%d - subs %d\n", client->clientid, state,
+				(int) client->readstate, (int) client->numsubscriptions);
+}
+
 void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker) {
 	printf("-- Topic hierachy --\n");
 	emcuetiti_topichandle* th = broker->root;
@@ -602,9 +641,7 @@ void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker) {
 	printf("-- Clients --\n");
 	for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
 		emcuetiti_clientstate* cs = &(broker->clients[i]);
-		if (cs->client != NULL)
-			printf("%s\t%d\t%d\n", cs->clientid, (int) cs->state,
-					(int) cs->readstate);
+		emcuetiti_broker_dumpstate_client(broker, cs);
 	}
 }
 

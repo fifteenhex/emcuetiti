@@ -23,7 +23,7 @@ public class TortureTest extends BaseMQTTTest {
                 break;
 
             try {
-                Thread.sleep(1000);
+                Thread.sleep(100);
             } catch (InterruptedException ie) {
                 throw new RuntimeException(ie);
             }

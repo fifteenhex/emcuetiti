@@ -131,9 +131,9 @@ int main(int argc, char** argv) {
 
 			emcuetiti_broker_poll(&broker);
 			loop++;
-			if ((loop % 10) == 0)
+			if ((loop % 100) == 0)
 				emcuetiti_broker_dumpstate(&broker);
-			g_usleep(1000000);
+			g_usleep(50000);
 		}
 		g_socket_close(serversocket, NULL);
 	} else
