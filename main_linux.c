@@ -66,6 +66,34 @@ static emcuetiti_brokerhandle_callbacks brokerops = { //
 				.writefunc = gsocket_write, //
 				.disconnectfunc = gsocket_disconnect };
 
+gboolean serversocket_callback(gpointer data) {
+	GSocket* serversocket = (GSocket*) data;
+	GSocket* clientsocket = g_socket_accept(serversocket, NULL, NULL);
+	if (clientsocket != NULL) {
+
+		if (emcuetiti_broker_canacceptmoreclients(&broker)) {
+			g_message("incoming connection");
+			emcuetiti_clienthandle* client = g_malloc(
+					sizeof(emcuetiti_clienthandle));
+
+			client->userdata = clientsocket;
+			client->ops = &gsocketclientops;
+			emcuetiti_client_register(&broker, client);
+		} else {
+			g_message("cannot accept any more clients, disconnecting client");
+			g_socket_close(clientsocket, NULL);
+		}
+	}
+
+	return TRUE;
+}
+
+gboolean brokerpoll(gpointer data) {
+	emcuetiti_brokerhandle* broker = (emcuetiti_brokerhandle*) data;
+	emcuetiti_broker_poll(broker);
+	return TRUE;
+}
+
 int main(int argc, char** argv) {
 
 	GSocketAddress* serversockaddr = g_inet_socket_address_new_from_string(
@@ -93,11 +121,13 @@ int main(int argc, char** argv) {
 
 		emcuetiti_broker_init(&broker);
 
-		emcuetiti_broker_addtopicpart(&broker, NULL, &topic1, "topic1", true);
+		emcuetiti_broker_addtopicpart(&broker, NULL, &topic1, "topic1",
+		true);
 		emcuetiti_broker_addtopicpart(&broker, &topic1, &subtopic1, "subtopic1",
 		true);
 
-		emcuetiti_broker_addtopicpart(&broker, NULL, &topic2, "topic2", true);
+		emcuetiti_broker_addtopicpart(&broker, NULL, &topic2, "topic2",
+		true);
 		emcuetiti_broker_addtopicpart(&broker, &topic2, &topic2subtopic1,
 				"topic1subtopic2", true);
 		emcuetiti_broker_addtopicpart(&broker, &topic2, &topic2subtopic2,
@@ -110,32 +140,20 @@ int main(int argc, char** argv) {
 		emcuetiti_porthandle routerport;
 		emcuetiti_port_router(&broker, &routerport);
 
-		while (true) {
-			//static int loop = 0;
-			GSocket* clientsocket = g_socket_accept(serversocket, NULL, NULL);
-			if (clientsocket != NULL) {
-				if (emcuetiti_broker_canacceptmoreclients(&broker)) {
-					g_message("incoming connection");
-					emcuetiti_clienthandle* client = g_malloc(
-							sizeof(emcuetiti_clienthandle));
+		GSource* serversocketsource = g_socket_create_source(serversocket,
+				G_IO_IN, NULL);
 
-					client->userdata = clientsocket;
-					client->ops = &gsocketclientops;
-					emcuetiti_client_register(&broker, client);
-				} else {
-					g_message(
-							"cannot accept any more clients, disconnecting client");
-					g_socket_close(clientsocket, NULL);
-				}
-			}
+		g_source_attach(serversocketsource, NULL);
+		g_source_set_callback(serversocketsource, serversocket_callback,
+				serversocket, NULL);
 
-			emcuetiti_broker_poll(&broker);
-			//loop++;
-			//if ((loop % 100) == 0)
-			//	emcuetiti_broker_dumpstate(&broker);
-			g_usleep(5000);
-		}
+		g_timeout_add(100, brokerpoll, &broker);
+
+		GMainLoop* mainloop = g_main_loop_new(NULL, FALSE);
+		g_main_loop_run(mainloop);
+
 		g_socket_close(serversocket, NULL);
+
 	} else
 		g_message("failed to create server socket");
 
