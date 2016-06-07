@@ -7,6 +7,15 @@
 #include "emcuetiti_priv.h"
 #include "emcuetiti.h"
 
+static void emcuetiti_broker_dumpstate_printtopic(emcuetiti_topichandle* node) {
+	bool first = node->parent == NULL;
+	if (!first) {
+		emcuetiti_broker_dumpstate_printtopic(node->parent);
+		printf("/");
+	}
+	printf("%s", node->topicpart);
+}
+
 static size_t min(size_t a, size_t b) {
 	if (a < b)
 		return a;
@@ -205,12 +214,14 @@ static void emcuetiti_handleinboundpacket_pingreq(
 }
 
 static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
-		emcuetiti_brokerhandle* broker, uint8_t* buffer, uint16_t* topiclen) {
+		emcuetiti_brokerhandle* broker, uint8_t* buffer, uint16_t* topiclen,
+		emcuetiti_subscription_level* level) {
 
 	int topicpartpos = 0;
 	char topicpart[32];
 
 	uint16_t len = (*(buffer++) << 8) | *(buffer++);
+	emcuetiti_subscription_level sublevel = ONLYTHIS;
 
 	printf("part len is %d\n", len);
 
@@ -220,8 +231,14 @@ static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 		if (i + 1 == len) {
 			topicpart[topicpartpos++] = byte;
 			topicpart[topicpartpos] = '\0';
-			printf("%s\n", topicpart);
-			t = emcuetiti_findtopic(broker, t, topicpart);
+
+			if (strcmp(topicpart, "#") == 0) {
+				printf("have multilevel wildcard\n");
+				sublevel = THISANDABOVE;
+			} else {
+				printf("%s\n", topicpart);
+				t = emcuetiti_findtopic(broker, t, topicpart);
+			}
 		} else if (byte == '/') {
 			topicpart[topicpartpos] = '\0';
 			topicpartpos = 0;
@@ -234,6 +251,9 @@ static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 
 	if (topiclen != NULL)
 		*topiclen = len;
+
+	if (level != NULL)
+		*level = sublevel;
 
 	return t;
 }
@@ -266,7 +286,7 @@ static void emcuetiti_handleinboundpacket_publish(
 
 	uint16_t topiclen;
 	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
-			cs->buffer, &topiclen);
+			cs->buffer, &topiclen, NULL);
 
 	if (t != NULL) {
 		cs->publishtopic = t;
@@ -355,8 +375,10 @@ static void emcuetiti_handleinboundpacket_subscribe(
 	uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
 
 	uint16_t topiclen;
+	emcuetiti_subscription_level level;
+
 	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
-			buffer, &topiclen);
+			buffer, &topiclen, &level);
 	buffer += 2 + topiclen;
 	uint8_t qos = *(buffer++);
 
@@ -377,6 +399,7 @@ static void emcuetiti_handleinboundpacket_subscribe(
 			if (cs->subscriptions[i].topic == NULL) {
 				cs->subscriptions[i].topic = t;
 				cs->subscriptions[i].qos = qos;
+				cs->subscriptions[i].level = level;
 				cs->numsubscriptions++;
 				returncodes[0] = 0;
 				break;
@@ -400,8 +423,10 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 	uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
 
 	uint16_t topiclen;
+	emcuetiti_subscription_level level;
+
 	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
-			buffer, &topiclen);
+			buffer, &topiclen, &level);
 	buffer += 2 + topiclen;
 
 	if (buffer != bufferend)
@@ -545,7 +570,9 @@ static int emcuetiti_topic_len(emcuetiti_topichandle* node) {
 void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 		emcuetiti_publish* publish) {
 
-	printf("outgoing publish\n");
+	printf("outgoing publish to ");
+	emcuetiti_broker_dumpstate_printtopic(publish->topic);
+	printf("\n");
 
 	for (int c = 0; c < ARRAY_ELEMENTS(broker->clients); c++) {
 
@@ -555,10 +582,27 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 
 			bool subbed = false;
 			for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
-				emcuetiti_topichandle* topic = cs->subscriptions[i].topic;
-				if (topic != NULL && topic == publish->topic) {
-					subbed = true;
-					break;
+				emcuetiti_subscription* sub = &(cs->subscriptions[i]);
+				emcuetiti_topichandle* topic = sub->topic;
+				if (topic != NULL) {
+					if (topic == publish->topic) {
+						subbed = true;
+					} else if (sub->level == THISANDABOVE) {
+						printf(
+								"looking for wildcard subscription below this level\n");
+						emcuetiti_topichandle* t = publish->topic;
+						while (t->parent != NULL) {
+							t = t->parent;
+							if (t == topic) {
+								printf("found wild card sub below target\n");
+								subbed = true;
+								break;
+							}
+						}
+					}
+
+					if (subbed)
+						break;
 				}
 			}
 
@@ -641,16 +685,6 @@ void emcuetiti_broker_init(emcuetiti_brokerhandle* broker) {
 	broker->registeredclients = 0;
 	memset(broker->ports, 0, sizeof(broker->ports));
 	memset(broker->clients, 0, sizeof(broker->clients));
-}
-
-static void emcuetiti_broker_dumpstate_printtopic(emcuetiti_topichandle* node) {
-	bool first = node->parent == NULL;
-	if (!first) {
-		emcuetiti_broker_dumpstate_printtopic(node->parent);
-		printf("/");
-	}
-
-	printf("%s", node->topicpart);
 }
 
 static void emcuetiti_broker_dumpstate_child(emcuetiti_topichandle* node) {

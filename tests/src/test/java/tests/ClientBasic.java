@@ -27,6 +27,20 @@ public class ClientBasic extends BaseMQTTTest {
         unsubFromTopics(mqttConnection, topics);
     }
 
+    @Test
+    public void subscribePublishUnsubscribeWildcard() {
+        BlockingConnection listener = mqttConnections[0];
+        BlockingConnection publisher = mqttConnections[1];
+        subscribeToTopic(listener, TOPIC + "/#");
+        try {
+            exchange(listener, publisher, TOPIC + "/" + SUBTOPIC, "hello", false);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            unsubFromTopic(listener, TOPIC + "/#");
+        }
+    }
+
 
     @Test
     public void publish() {

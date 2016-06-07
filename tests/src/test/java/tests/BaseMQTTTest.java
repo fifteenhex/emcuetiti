@@ -17,6 +17,7 @@ public class BaseMQTTTest {
     private static final int MQTT_CLIENTS = 2;
 
     protected static final String TOPIC = "topic1";
+    protected static final String SUBTOPIC = "subtopic1";
     protected static final String TOPIC2 = "topic2";
 
     private static Process brokerProcess;

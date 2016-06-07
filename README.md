@@ -26,3 +26,8 @@ Ports could be used to implement:
 -	An interface to drive your local application logic from publishes coming into the broker
 -	An MQTT client that passes messages local messages to a remote broker
 -	client->client routing like a standard broker.
+
+
+Limitations
+
+-	+ wildcard is not supported.

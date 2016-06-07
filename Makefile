@@ -1,5 +1,5 @@
 PKGS=glib-2.0 gio-2.0
-CFLAGS=-ggdb `pkg-config --cflags $(PKGS)` -I ./include -Werror-implicit-function-declaration
+CFLAGS=-Os -ggdb `pkg-config --cflags $(PKGS)` -I ./include -Werror-implicit-function-declaration
 LFLAGS=`pkg-config --libs $(PKGS)`
 
 all: emcuetiti_linux testharness_basic

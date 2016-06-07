@@ -76,9 +76,15 @@ typedef enum {
 	CLIENTREADSTATE_PUBLISHREADY
 } emcuetiti_clientreadstate;
 
+typedef enum {
+	ONLYTHIS, THISANDABOVE
+} emcuetiti_subscription_level;
+
 typedef struct {
 	emcuetiti_topichandle* topic;
 	uint8_t qos;
+	emcuetiti_subscription_level level;
+
 } emcuetiti_subscription;
 
 struct emcuetiti_clientstate {
