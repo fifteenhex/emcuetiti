@@ -285,7 +285,7 @@ static void emcuetiti_handleinboundpacket_publish(
 				printf("dispatching publish to port %d\n", p);
 				if (broker->ports[p]->publishreadycallback != NULL)
 					broker->ports[p]->publishreadycallback(broker, cs->client,
-							cs->publishpayloadlen);
+							t, cs->publishpayloadlen);
 			}
 		}
 
@@ -350,14 +350,18 @@ static void emcuetiti_handleinboundpacket_subscribe(
 	uint8_t returncodes[] = { LIBMQTT_SUBSCRIBERETURNCODE_FAILURE };
 
 	uint8_t* buffer = cs->buffer;
+	uint8_t* bufferend = cs->buffer + cs->varheaderandpayloadlen;
+
 	uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
 
 	uint16_t topiclen;
 	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
 			buffer, &topiclen);
 	buffer += 2 + topiclen;
-
 	uint8_t qos = *(buffer++);
+
+	if (buffer != bufferend)
+		printf("probably have more topics\n");
 
 	printf("sub from %s, messageid %d, qos %d\n", cs->clientid, (int) messageid,
 			(int) qos);
@@ -370,8 +374,9 @@ static void emcuetiti_handleinboundpacket_subscribe(
 	if (qosisvalid && t != NULL) {
 		bool added = false;
 		for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
-			if (cs->subscriptions[i] == NULL) {
-				cs->subscriptions[i] = t;
+			if (cs->subscriptions[i].topic == NULL) {
+				cs->subscriptions[i].topic = t;
+				cs->subscriptions[i].qos = qos;
 				cs->numsubscriptions++;
 				returncodes[0] = 0;
 				break;
@@ -390,12 +395,17 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 	void* userdata = cs->client->userdata;
 
 	uint8_t* buffer = cs->buffer;
+	uint8_t* bufferend = cs->buffer + cs->varheaderandpayloadlen;
+
 	uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
 
 	uint16_t topiclen;
 	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
 			buffer, &topiclen);
 	buffer += 2 + topiclen;
+
+	if (buffer != bufferend)
+		printf("probably more topics\n");
 
 	printf("unsub from %s, messageid %d\n", cs->clientid, (int) messageid);
 
@@ -404,8 +414,8 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 	} else {
 
 		for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
-			if (cs->subscriptions[i] == t) {
-				cs->subscriptions[i] = NULL;
+			if (cs->subscriptions[i].topic == t) {
+				cs->subscriptions[i].topic = NULL;
 				cs->numsubscriptions--;
 				break;
 			}
@@ -506,6 +516,32 @@ void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 	}
 }
 
+static int emcuetiti_topic_topichandlewrite(libmqtt_writefunc writefunc,
+		void *writefuncuserdata, void* userdata) {
+
+	int len = 0;
+	emcuetiti_topichandle* node = (emcuetiti_topichandle*) userdata;
+
+	bool first = node->parent == NULL;
+	if (!first) {
+		len += emcuetiti_topic_topichandlewrite(writefunc, writefuncuserdata,
+				node->parent) + 1;
+		writefunc(writefuncuserdata, "/", 1);
+	}
+
+	writefunc(writefuncuserdata, node->topicpart, node->topicpartln);
+	return len;
+}
+
+static int emcuetiti_topic_len(emcuetiti_topichandle* node) {
+	int len = 0;
+	bool first = node->parent == NULL;
+	if (!first) {
+		len += (emcuetiti_topic_len(node->parent) + 1);
+	}
+	return len + node->topicpartln;
+}
+
 void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 		emcuetiti_publish* publish) {
 
@@ -517,23 +553,36 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 
 		if (cs->state == CLIENTSTATE_CONNECTED) {
 
-			printf("sending publish to %s\n", cs->clientid);
+			bool subbed = false;
+			for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
+				emcuetiti_topichandle* topic = cs->subscriptions[i].topic;
+				if (topic != NULL && topic == publish->topic) {
+					subbed = true;
+					break;
+				}
+			}
 
-			libmqtt_writefunc clientwritefunc = emcuetiti_resolvewritefunc(
-					broker, &broker->clients[c]);
+			if (subbed) {
+				printf("sending publish to %s\n", cs->clientid);
 
-			libmqtt_construct_publish(clientwritefunc, //
-					broker->clients[c].client->userdata, //
-					publish->readfunc, //
-					publish->userdata, //
-					"/topic1", //
-					publish->payloadln, //
-					LIBMQTT_QOS0_ATMOSTONCE, //
-					false, //
-					false, 0);
+				libmqtt_writefunc clientwritefunc = emcuetiti_resolvewritefunc(
+						broker, &broker->clients[c]);
 
-			if (publish->resetfunc != NULL)
-				publish->resetfunc(publish->userdata);
+				libmqtt_construct_publish(clientwritefunc, //
+						broker->clients[c].client->userdata, //
+						publish->readfunc, //
+						publish->userdata, //
+						emcuetiti_topic_topichandlewrite, //
+						publish->topic, //
+						emcuetiti_topic_len(publish->topic), //
+						publish->payloadln, //
+						LIBMQTT_QOS0_ATMOSTONCE, //
+						false, //
+						false, 0);
+
+				if (publish->resetfunc != NULL)
+					publish->resetfunc(publish->userdata);
+			}
 		}
 	}
 
@@ -564,6 +613,7 @@ void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 	part->parent = NULL;
 
 	part->topicpart = topicpart;
+	part->topicpartln = strlen(topicpart);
 	part->targetable = targetable;
 
 	if (root == NULL) {

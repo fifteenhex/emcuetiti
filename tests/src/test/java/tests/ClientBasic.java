@@ -4,6 +4,7 @@ import org.fusesource.mqtt.client.BlockingConnection;
 import org.fusesource.mqtt.client.Message;
 import org.fusesource.mqtt.client.QoS;
 import org.fusesource.mqtt.client.Topic;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.concurrent.TimeUnit;
@@ -19,28 +20,28 @@ public class ClientBasic extends BaseMQTTTest {
     }
 
     @Test
+    public void subscribeAndUnsubscribeMultiple() {
+        BlockingConnection mqttConnection = mqttConnections[0];
+        String[] topics = new String[]{TOPIC, TOPIC2};
+        subscribeToTopics(mqttConnection, topics);
+        unsubFromTopics(mqttConnection, topics);
+    }
+
+
+    @Test
     public void publish() {
-        BlockingConnection listener = mqttConnections[0];
-        BlockingConnection publisher = mqttConnections[1];
-
-        subscribeToTopic(listener, TOPIC);
-
-        String payloadOut = "Hello";
-
+        String payload = "Hello";
+        subscribeToTopic(mqttConnections[0], TOPIC);
+        subscribeToTopic(mqttConnections[1], TOPIC2);
         try {
-            publisher.publish(TOPIC, payloadOut.getBytes(), QoS.AT_MOST_ONCE, false);
-
-            Message receivedPublish = listener.receive(10, TimeUnit.SECONDS);
-            assert (receivedPublish != null);
-
-            String payloadIn = new String(receivedPublish.getPayload(), "UTF-8");
-
-            assert (payloadIn.equals(payloadOut));
-
+            exchange(mqttConnections[0], mqttConnections[1], TOPIC, payload, true);
+            exchange(mqttConnections[1], mqttConnections[0], TOPIC2, payload, true);
         } catch (Exception e) {
             throw new RuntimeException(e);
+        } finally {
+            unsubFromTopic(mqttConnections[0], TOPIC);
+            unsubFromTopic(mqttConnections[1], TOPIC2);
         }
-        unsubFromTopic(listener, TOPIC);
     }
 
 }

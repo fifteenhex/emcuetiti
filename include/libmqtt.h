@@ -52,6 +52,9 @@ typedef int (*libmqtt_writefunc)(void* userdata, const uint8_t* buffer,
 		size_t len);
 typedef int (*libmqtt_readfunc)(void* userdata, uint8_t* buffer, size_t len);
 
+typedef int (*libmqtt_topicwriter)(libmqtt_writefunc writefunc,
+		void* writefuncuserdata, void* userdata);
+
 typedef struct {
 	const char* topic;
 	uint8_t qos;
@@ -68,8 +71,14 @@ int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
 
 int libmqtt_construct_connack(libmqtt_writefunc writefunc, void* userdata);
 
-int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
-		libmqtt_readfunc readfunc, void* readuserdata, const char* topic,
+int libmqtt_construct_publish(
+		libmqtt_writefunc writefunc, //
+		void* writeuserdata, //
+		libmqtt_readfunc readfunc, //
+		void* readuserdata, //
+		libmqtt_topicwriter topicwriter, //
+		void* topicdata, //
+		size_t topicln, //
 		size_t payloadlen, libmqtt_qos qos, bool duplicate, bool retain,
 		uint16_t id);
 

@@ -10,11 +10,13 @@
 typedef struct emcuetiti_clienthandle emcuetiti_clienthandle;
 typedef struct emcuetiti_clientstate emcuetiti_clientstate;
 typedef struct emcuetiti_brokerhandle emcuetiti_brokerhandle;
+typedef struct emcuetiti_topichandle emcuetiti_topichandle;
 
 // function prototypes
 
 typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* client, size_t payloadlen);
+		emcuetiti_clienthandle* client, emcuetiti_topichandle* topic,
+		size_t payloadlen);
 typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
 typedef bool (*emcuetiti_isconnected)(void* userdata);
 
@@ -33,13 +35,14 @@ typedef void (*emcuetiti_disconnectfunc)(emcuetiti_brokerhandle* broker,
 typedef EMCUETITI_CONFIG_TIMESTAMPTYPE (*emcuetiti_timstampfunc)(void);
 
 // shared structures
-typedef struct emcuetiti_topichandle {
+struct emcuetiti_topichandle {
 	const char* topicpart;
+	size_t topicpartln;
 	struct emucutiti_topichandle* child;
 	struct emcuetiti_topichandle* sibling;
 	struct emcuetiti_topichandle* parent;
 	bool targetable;
-} emcuetiti_topichandle;
+};
 
 // client structures
 typedef struct {
@@ -73,6 +76,11 @@ typedef enum {
 	CLIENTREADSTATE_PUBLISHREADY
 } emcuetiti_clientreadstate;
 
+typedef struct {
+	emcuetiti_topichandle* topic;
+	uint8_t qos;
+} emcuetiti_subscription;
+
 struct emcuetiti_clientstate {
 	emcuetiti_clienthandle* client;
 	char clientid[LIBMQTT_CLIENTID_MAXLENGTH + 1];
@@ -80,7 +88,7 @@ struct emcuetiti_clientstate {
 	EMCUETITI_CONFIG_TIMESTAMPTYPE lastseen;
 
 	unsigned numsubscriptions;
-	emcuetiti_topichandle* subscriptions[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
+	emcuetiti_subscription subscriptions[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
 
 	uint8_t buffer[EMCUETITI_CONFIG_CLIENTBUFFERSZ];
 	unsigned bufferpos;

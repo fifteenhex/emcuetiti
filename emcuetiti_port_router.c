@@ -19,7 +19,8 @@ static void emcuetiti_router_resetfunc(void* userdata) {
 }
 
 static int emcuetiti_port_publishreadycallback(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* client, size_t publishlen) {
+		emcuetiti_clienthandle* client, emcuetiti_topichandle* topic,
+		size_t publishlen) {
 	printf("publish ready\n");
 	uint8_t* buffer = g_malloc(publishlen + 1);
 	int read = emcuetiti_client_readpublish(broker, client, buffer, publishlen);
@@ -29,7 +30,8 @@ static int emcuetiti_port_publishreadycallback(emcuetiti_brokerhandle* broker,
 	emcuetiti_bufferholder bh = { .buffer = buffer, .len = publishlen,
 			.readpos = 0 };
 
-	emcuetiti_publish pub = { .readfunc = emcuetiti_router_readfunc, //
+	emcuetiti_publish pub = { .topic = topic, //
+			.readfunc = emcuetiti_router_readfunc, //
 			.resetfunc = emcuetiti_router_resetfunc, //
 			.userdata = &bh, //
 			.payloadln = publishlen };

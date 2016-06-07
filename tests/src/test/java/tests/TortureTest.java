@@ -10,9 +10,9 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
+
 public class TortureTest extends BaseMQTTTest {
 
-    @Ignore
     @Test
     public void subscribeAndUnsubscribeTorture() {
         BlockingConnection mqttConnection = mqttConnections[0];
@@ -60,6 +60,24 @@ public class TortureTest extends BaseMQTTTest {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    @Test
+    public void publishTorture() {
+        String payload = "Hello";
+        subscribeToTopic(mqttConnections[0], TOPIC);
+        subscribeToTopic(mqttConnections[1], TOPIC2);
+        try {
+            for (int i = 0; i < 1024; i++) {
+                exchange(mqttConnections[0], mqttConnections[1], TOPIC, payload, false);
+                exchange(mqttConnections[1], mqttConnections[0], TOPIC2, payload, false);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            unsubFromTopic(mqttConnections[0], TOPIC);
+            unsubFromTopic(mqttConnections[1], TOPIC2);
         }
     }
 

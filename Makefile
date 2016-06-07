@@ -25,4 +25,4 @@ testharness_basic: testharness_basic.c testutils.c emcuetiti.o libmqtt.o
 .PHONY: clean
 
 clean:
-	rm -f *.o
+	rm -f *.o emcuetiti_linux

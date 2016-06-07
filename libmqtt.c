@@ -30,6 +30,13 @@ static void libmqtt_appendlengthandstring(libmqtt_writefunc writefunc,
 	writefunc(userdata, string, len);
 }
 
+static void libmqtt_appendlengthandstring_writer(libmqtt_writefunc writefunc,
+		void* userdata, libmqtt_topicwriter writer, void* topicdata, size_t len) {
+	uint8_t strlen[2] = { ((len >> 8) & 0xff), (len & 0xff) };
+	writefunc(userdata, strlen, sizeof(strlen));
+	writer(writefunc, userdata, topicdata);
+}
+
 static int libmqtt_construct_genericack(libmqtt_writefunc writefunc,
 		void* userdata, uint8_t typeandflags, uint16_t messageid) {
 	libmqtt_messageid_variableheader varheader = { //
@@ -179,14 +186,19 @@ int libmqtt_construct_connack(libmqtt_writefunc writefunc, void* userdata) {
 	return 0;
 }
 
-int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
-		libmqtt_readfunc readfunc, void* readuserdata, const char* topic,
+int libmqtt_construct_publish(
+		libmqtt_writefunc writefunc,// function to write data into the client or buffer
+		void* writeuserdata,		// pointer to the data needed for the above
+		libmqtt_readfunc readfunc,		// function to read data for the payload
+		void* readuserdata,			// pointer to the data needed for the above
+		libmqtt_topicwriter topicwriter,// function to write the topic into the client or buffer
+		void* topicdata, 			// point to the data needed for the above
+		size_t topiclen,				// length the topic that will be written
 		size_t payloadlen, libmqtt_qos qos, bool duplicate, bool retain,
 		uint16_t id) {
 
 	bool needsid = qos > LIBMQTT_QOS0_ATMOSTONCE;
 
-	size_t topiclen = strlen(topic);
 	libmqtt_messageid_variableheader messageid = { .packetidmsb = (id >> 8)
 			& 0xff, .packetidlsb = id & 0xff };
 
@@ -201,7 +213,8 @@ int libmqtt_construct_publish(libmqtt_writefunc writefunc, void* writeuserdata,
 	writefunc(writeuserdata, fixedheader, 1 + remainingbytesfiedlen);
 
 	// var header
-	libmqtt_appendlengthandstring(writefunc, writeuserdata, topic, topiclen);
+	libmqtt_appendlengthandstring_writer(writefunc, writeuserdata, topicwriter,
+			topicdata, topiclen);
 	if (needsid)
 		writefunc(writeuserdata, (uint8_t*) &messageid, sizeof(messageid));
 

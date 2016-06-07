@@ -2,11 +2,9 @@ package tests;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.concurrent.TimeUnit;
 
-import org.fusesource.mqtt.client.BlockingConnection;
-import org.fusesource.mqtt.client.MQTT;
-import org.fusesource.mqtt.client.QoS;
-import org.fusesource.mqtt.client.Topic;
+import org.fusesource.mqtt.client.*;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -18,7 +16,8 @@ public class BaseMQTTTest {
     private static final int MQTT_PORT = 8991;
     private static final int MQTT_CLIENTS = 2;
 
-    protected static final String TOPIC = "/topic1";
+    protected static final String TOPIC = "topic1";
+    protected static final String TOPIC2 = "topic2";
 
     private static Process brokerProcess;
     protected static BlockingConnection[] mqttConnections = new BlockingConnection[MQTT_CLIENTS];
@@ -115,6 +114,46 @@ public class BaseMQTTTest {
             mqttConnection.unsubscribe(new String[]{topic});
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    protected void subscribeToTopics(final BlockingConnection mqttConnection, final String[] topic) {
+        try {
+            Topic[] topics = new Topic[topic.length];
+            for (int i = 0; i < topics.length; i++) {
+                Topic t = new Topic(topic[i], QoS.AT_LEAST_ONCE);
+                topics[i] = t;
+            }
+            mqttConnection.subscribe(topics);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected void unsubFromTopics(final BlockingConnection mqttConnection, final String[] topics) {
+        try {
+            mqttConnection.unsubscribe(topics);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected void exchange(BlockingConnection listener, BlockingConnection publisher, String topic, String payload, boolean checkPublisher) throws Exception {
+
+        publisher.publish(topic, payload.getBytes(), QoS.AT_MOST_ONCE, false);
+
+        // check that the client subbed to the topic gets the publish and it matches
+        Message receivedPublish = listener.receive(10, TimeUnit.SECONDS);
+        assert (receivedPublish != null) : "should have received a publish, didn't get one";
+        assert (receivedPublish.getTopic().equals(topic)) : "wanted topic " + topic + " but got " + receivedPublish.getTopic();
+        String payloadIn = new String(receivedPublish.getPayload(), "UTF-8");
+        assert (payloadIn.equals(payload));
+
+
+        if (checkPublisher) {
+            // check that the publishing client didn't get the publish
+            Message shouldNotReceivePublish = publisher.receive(10, TimeUnit.SECONDS);
+            assert (shouldNotReceivePublish == null) : "shouldn't have received a publish but got one";
         }
     }
 
