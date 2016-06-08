@@ -1,0 +1,3 @@
+#pragma once
+
+#define EMCUETITI_ERROR_NOMORECLIENTS	-2

@@ -42,9 +42,11 @@ void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
 		printf("failed to register port\n");
 }
 
-void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
+int emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle) {
-	bool registered = false;
+
+	int ret = 0;
+
 	if (broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS) {
 		// search for a free slot to put this client
 		for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
@@ -58,17 +60,17 @@ void emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 				memset(cs->subscriptions, 0, sizeof(cs->subscriptions));
 				cs->numsubscriptions = 0;
 
-				registered = true;
+				broker->registeredclients++;
+				printf("registered client, now have %d clients\n",
+						broker->registeredclients);
+
 				break;
 			}
 		}
-	}
+	} else
+		ret = EMCUETITI_ERROR_NOMORECLIENTS;
 
-	if (registered) {
-		broker->registeredclients++;
-		printf("registered client, now have %d clients\n",
-				broker->registeredclients);
-	}
+	return ret;
 }
 
 void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
