@@ -1,5 +1,7 @@
 #include <string.h>
 
+#include <stdio.h>
+
 #include "libmqtt_priv.h"
 #include "libmqtt.h"
 
@@ -97,8 +99,8 @@ int libmqtt_decodelength(uint8_t* buffer, size_t* len) {
 }
 
 int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
-		const char* clientid, const char* willtopic, const char* willmessage,
-		const char* username, const char* password) {
+		uint16_t keepalive, const char* clientid, const char* willtopic,
+		const char* willmessage, const char* username, const char* password) {
 
 	uint8_t flags = 0;
 	size_t clientidlen = strlen(clientid);
@@ -132,7 +134,8 @@ int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
 			.lengthmsb = 0, //
 			.lengthlsb = 4, //
 			.protocolname = { 'M', 'Q', 'T', 'T' }, .protocollevel = 0x04,
-			.flags = flags, .keepalivemsb = 0, .keepalivelsb = 0 };
+			.flags = flags, .keepalivemsb = LIBMQTT_MSB(keepalive),
+			.keepalivelsb = LIBMQTT_MSB(keepalive) };
 
 // now we know how much var header and payload we have we can calculate the
 // length of the fixed header
@@ -363,3 +366,185 @@ int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 	memcpy(buffer, mqttstring + 2, strlen);
 	return 0;
 }
+
+int libmqtt_readpkt_changestate(libmqtt_packetread* pkt,
+		libmqtt_packetreadchange changefunc, libmqtt_packetread_state newstate) {
+	int ret = 0;
+
+	pkt->counter = 0;
+	pkt->state = newstate;
+
+	// if all of the packet has been read move to finished instead of the next state
+	if (pkt->state > LIBMQTT_PACKETREADSTATE_LEN)
+		if (pkt->pos == pkt->length)
+			pkt->state = LIBMQTT_PACKETREADSTATE_FINISHED;
+
+	if (changefunc != NULL)
+		ret = changefunc(pkt);
+
+	return ret;
+}
+
+int libmqtt_readpkt_read(libmqtt_packetread* pkt, libmqtt_readfunc readfunc,
+		void* readuserdata, void* buff, size_t len) {
+	int ret = readfunc(readuserdata, buff, len);
+	if (ret > 0) {
+		pkt->pos += ret;
+		pkt->counter += ret;
+	}
+	//printf("read: %d\n", ret);
+	return ret;
+}
+
+int libmqtt_readpkt(libmqtt_packetread* pkt,
+		libmqtt_packetreadchange changefunc, libmqtt_readfunc readfunc,
+		void* readuserdata, libmqtt_writefunc payloadwritefunc,
+		void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	// reset a finished or error'd packet
+	if (pkt->state >= LIBMQTT_PACKETREADSTATE_FINISHED)
+		memset(pkt, 0, sizeof(*pkt));
+
+	while (pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED && ret >= 0) {
+		//printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
+		//		pkt->pos);
+		switch (pkt->state) {
+		case LIBMQTT_PACKETREADSTATE_TYPE: {
+			uint8_t typeandflags;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata,
+					&typeandflags, 1);
+			if (ret == 1) {
+				pkt->type = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(
+						typeandflags);
+
+				// check for valid packet type
+				if (pkt->type >= LIBMQTT_PACKETTYPE_CONNECT
+						&& pkt->type <= LIBMQTT_PACKETTYPE_DISCONNECT) {
+					pkt->length = 1;
+					pkt->lenmultiplier = 1;
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_LEN);
+				} else
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_ERROR);
+			}
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_LEN: {
+			uint8_t lenbyte;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &lenbyte,
+					1);
+			if (ret == 1) {
+				pkt->length += 1 + (LIBMQTT_LEN(lenbyte) * pkt->lenmultiplier);
+				pkt->lenmultiplier *= 128;
+				// last byte of the length has been read
+				if (LIBMQTT_ISLASTLENBYTE(lenbyte)) {
+					bool hasmessageid = (pkt->type == LIBMQTT_PACKETTYPE_PUBACK)
+							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREC)
+							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREL)
+							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBCOMP)
+							|| (pkt->type == LIBMQTT_PACKETTYPE_SUBSCRIBE)
+							|| (pkt->type == LIBMQTT_PACKETTYPE_SUBACK)
+							|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBSCRIBE)
+							|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBACK);
+
+					// connacks has a flags byte and a return code byte
+					if (pkt->type == LIBMQTT_PACKETTYPE_CONNACK)
+						libmqtt_readpkt_changestate(pkt, changefunc,
+								LIBMQTT_PACKETREADSTATE_CONNFLAGS);
+					// publishes always have a topic
+					else if (pkt->type == LIBMQTT_PACKETTYPE_PUBLISH)
+						libmqtt_readpkt_changestate(pkt, changefunc,
+								LIBMQTT_PACKETREADSTATE_TOPICLEN);
+					// some packets have a message id
+					else if (hasmessageid)
+						libmqtt_readpkt_changestate(pkt, changefunc,
+								LIBMQTT_PACKETREADSTATE_MSGID);
+					else
+						libmqtt_readpkt_changestate(pkt, changefunc,
+								LIBMQTT_PACKETREADSTATE_PAYLOAD);
+				}
+			}
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_TOPICLEN: {
+			uint8_t topiclenbyte;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata,
+					&topiclenbyte, 1);
+			if (ret == 1) {
+				pkt->varhdr.topiclen = (pkt->varhdr.topiclen << 8)
+						| topiclenbyte;
+				if (pkt->counter == 2)
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_TOPIC);
+			};
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_TOPIC: {
+			uint8_t topicbyte;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &topicbyte,
+					1);
+			if (ret == 1) {
+				if (pkt->counter == pkt->varhdr.topiclen)
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_MSGID);
+			};
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_MSGID: {
+			uint8_t msgidbyte;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &msgidbyte,
+					1);
+			if (ret == 1) {
+				pkt->varhdr.msgid = (pkt->varhdr.msgid << 8) | msgidbyte;
+				if (pkt->counter == 2)
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_PAYLOAD);
+			};
+
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_CONNFLAGS: {
+			uint8_t flags;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &flags, 1);
+			if (ret == 1) {
+				pkt->varhdr.connack.ackflags = flags;
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_CONNRET);
+			}
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_CONNRET: {
+			uint8_t returncode;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &returncode,
+					1);
+			if (ret == 1) {
+				pkt->varhdr.connack.returncode = returncode;
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_FINISHED);
+			}
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_PAYLOAD: {
+			uint8_t buff[32];
+			size_t readsz = sizeof(buff);
+			size_t remaining = pkt->length - pkt->pos;
+			if (remaining < readsz)
+				readsz = remaining;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, buff,
+					readsz);
+			if (ret > 0) {
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_PAYLOAD);
+			}
+		}
+			break;
+		}
+
+	}
+
+	return ret;
+}
+

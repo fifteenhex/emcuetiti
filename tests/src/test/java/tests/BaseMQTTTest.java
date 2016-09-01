@@ -2,8 +2,12 @@ package tests;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import io.moquette.BrokerConstants;
+import io.moquette.server.Server;
+import io.moquette.server.config.MemoryConfig;
 import org.fusesource.mqtt.client.*;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -16,6 +20,7 @@ public class BaseMQTTTest {
     private static final int MQTT_PORT = 8991;
     private static final int MQTT_CLIENTS = 2;
 
+
     protected static final String TOPIC = "topic1";
     protected static final String SUBTOPIC = "subtopic1";
     protected static final String TOPIC2 = "topic2";
@@ -26,6 +31,7 @@ public class BaseMQTTTest {
     public static void log(String message) {
         System.out.println(message);
     }
+
 
     @BeforeClass
     public static void startBrokerAndCreateClients() {

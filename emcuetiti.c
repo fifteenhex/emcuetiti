@@ -23,25 +23,6 @@ static size_t min(size_t a, size_t b) {
 		return b;
 }
 
-void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
-		emcuetiti_porthandle* port) {
-
-	bool registered = false;
-
-	for (int i = 0; i < ARRAY_ELEMENTS(broker->ports); i++) {
-		if (broker->ports[i] == NULL) {
-			broker->ports[i] = port;
-			registered = true;
-			break;
-		}
-	}
-
-	if (registered)
-		printf("port registered\n");
-	else
-		printf("failed to register port\n");
-}
-
 int emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle) {
 
@@ -144,7 +125,7 @@ EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
 		break;
 	case CLIENTREADSTATE_REMAININGLEN:
 		if (readfunc(userdata, offsetbuffer, 1) == 1) {
-			if ((*offsetbuffer & (1 << 7)) == 0) {
+			if (LIBMQTT_ISLASTLENBYTE(*offsetbuffer)) {
 				libmqtt_decodelength(cs->buffer, &cs->varheaderandpayloadlen);
 				if (cs->varheaderandpayloadlen > 0) {
 					cs->readstate = CLIENTREADSTATE_PAYLOAD;
@@ -518,6 +499,9 @@ static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
 
 void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 	EMCUETITI_CONFIG_TIMESTAMPTYPE now = broker->callbacks->timestamp();
+
+	emcuetiti_port_poll(broker, now);
+
 	if (broker->registeredclients > 0) {
 		for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
 			emcuetiti_clientstate* cs = broker->clients + i;
@@ -525,14 +509,21 @@ void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 				switch (cs->state) {
 				case CLIENTSTATE_NEW:
 				case CLIENTSTATE_CONNECTED:
+
 					if (cs->client->ops->isconnectedfunc(
 							cs->client->userdata)) {
-						emcuetiti_poll_read(cs, now);
+
+						switch (cs->readstate) {
+						case CLIENTREADSTATE_COMPLETE:
+							emcuetiti_handleinboundpacket(broker, cs);
+							break;
+						default:
+							emcuetiti_poll_read(cs, now);
+							break;
+						}
 
 						emcuetiti_broker_poll_checkkeepalive(broker, cs, now);
 
-						if (cs->readstate == CLIENTREADSTATE_COMPLETE)
-							emcuetiti_handleinboundpacket(broker, cs);
 					} else
 						emcuetiti_disconnectclient(broker, cs);
 

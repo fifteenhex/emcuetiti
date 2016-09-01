@@ -10,13 +10,16 @@ libmqtt.o: libmqtt.c include/libmqtt.h
 emcuetiti.o: emcuetiti.c include/emcuetiti_config.h include/emcuetiti_priv.h include/emcuetiti.h
 	$(CC) $(CFLAGS) -c $<
 
+emcuetiti_port.o: emcuetiti_port.c include/emcuetiti.h 
+	$(CC) $(CFLAGS) -c $<
+
 emcuetiti_port_router.o: emcuetiti_port_router.c include/emcuetiti_port_router.h 
 	$(CC) $(CFLAGS) -c $<
 
-emcuetiti_port_proxy.o: emcuetiti_port_proxy.c include/emcuetiti_port_proxy.h
+emcuetiti_port_remote.o: emcuetiti_port_remote.c include/emcuetiti_port_remote.h
 	$(CC) $(CFLAGS) -c $<
 
-emcuetiti_linux: main_linux.c libmqtt.o emcuetiti.o emcuetiti_port_router.o emcuetiti_port_proxy.o
+emcuetiti_linux: main_linux.c libmqtt.o emcuetiti.o emcuetiti_port_router.o emcuetiti_port_remote.o emcuetiti_port.o
 	$(CC) $(CFLAGS) $(LFLAGS) -o $@ $^
 
 testharness_basic: testharness_basic.c testutils.c emcuetiti.o libmqtt.o

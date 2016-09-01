@@ -46,7 +46,9 @@ static int emcuetiti_port_publishreadycallback(emcuetiti_brokerhandle* broker,
 void emcuetiti_port_router(emcuetiti_brokerhandle* broker,
 		emcuetiti_porthandle* port) {
 
+	port->pollfunc = NULL;
 	port->publishreadycallback = emcuetiti_port_publishreadycallback;
+	port->portdata = NULL;
 
 	emcuetiti_port_register(broker, port);
 }

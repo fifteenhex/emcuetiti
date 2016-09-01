@@ -4,6 +4,9 @@
 
 #define EMCUETITI_CONFIG_DEBUG				true
 
+// config for the host
+#define EMCUETITI_CONFIG_HAVETLS			true
+
 // config for ports
 #define EMCUETITI_CONFIG_MAXPORTS			4
 

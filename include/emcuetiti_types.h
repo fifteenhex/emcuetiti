@@ -5,6 +5,8 @@
 #include "emcuetiti_config.h"
 #include "libmqtt.h"
 
+typedef EMCUETITI_CONFIG_TIMESTAMPTYPE emcuetiti_timestamp;
+
 // forward typedefs
 
 typedef struct emcuetiti_clienthandle emcuetiti_clienthandle;
@@ -28,11 +30,12 @@ typedef libmqtt_readfunc emcuetiti_readfunc;
 typedef void (*emcuetiti_freefunc)(void* userdata);
 typedef int (*emcuetiti_allocfunc)(void* userdata, size_t size);
 typedef void (*emcuetiti_resetfunc)(void* userdata);
+typedef void (*emcuetiti_pollfunc)(emcuetiti_timestamp now, void* userdata);
 
 typedef void (*emcuetiti_disconnectfunc)(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* client);
 
-typedef EMCUETITI_CONFIG_TIMESTAMPTYPE (*emcuetiti_timstampfunc)(void);
+typedef emcuetiti_timestamp (*emcuetiti_timstampfunc)(void);
 
 // shared structures
 struct emcuetiti_topichandle {
@@ -112,6 +115,8 @@ struct emcuetiti_clientstate {
 
 typedef struct {
 	emcuetiti_publishreadyfunc publishreadycallback;
+	emcuetiti_pollfunc pollfunc;
+	void* portdata;
 } emcuetiti_porthandle;
 
 // broker structures

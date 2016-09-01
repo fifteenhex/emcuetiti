@@ -3,17 +3,19 @@ apply plugin: 'eclipse'
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 dependencies {
-	testCompile 'org.fusesource.mqtt-client:mqtt-client:1.12'
-	testCompile group: 'junit', name: 'junit', version: '4.+'
+    testCompile 'org.fusesource.mqtt-client:mqtt-client:1.12'
+    testCompile group: 'junit', name: 'junit', version: '4.+'
+    testCompile 'io.moquette:moquette-broker:+'
 }
 
-test.outputs.upToDateWhen {false}
+test.outputs.upToDateWhen { false }
 
 test {
-	testLogging {
-		showStandardStreams = true
-	}
+    testLogging {
+        showStandardStreams = true
+    }
 }
