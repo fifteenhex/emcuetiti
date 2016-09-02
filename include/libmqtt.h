@@ -51,8 +51,9 @@ typedef enum {
 #define LIBMQTT_LEN(b) (b & ~(1 << 7))
 #define LIBMQTT_ISLASTLENBYTE(b) ((b & (1 << 7)) == 0)
 
-#define LIBMQTT_EFATAL			-1
-#define LIBMQTT_EWOULDBLOCK		-2
+#define LIBMQTT_EWOULDBLOCK			-1
+#define LIBMQTT_EREMOTEDISCONNECTED	-2
+#define LIBMQTT_EFATAL				-3
 
 // types
 typedef struct {

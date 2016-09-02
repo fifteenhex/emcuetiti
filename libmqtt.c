@@ -375,7 +375,8 @@ int libmqtt_readpkt_changestate(libmqtt_packetread* pkt,
 	pkt->state = newstate;
 
 	// if all of the packet has been read move to finished instead of the next state
-	if (pkt->state > LIBMQTT_PACKETREADSTATE_LEN)
+	if (pkt->state > LIBMQTT_PACKETREADSTATE_LEN
+			&& pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED)
 		if (pkt->pos == pkt->length)
 			pkt->state = LIBMQTT_PACKETREADSTATE_FINISHED;
 
@@ -544,6 +545,10 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 		}
 
 	}
+
+	if (ret == LIBMQTT_EFATAL)
+		libmqtt_readpkt_changestate(pkt, changefunc,
+				LIBMQTT_PACKETREADSTATE_ERROR);
 
 	return ret;
 }

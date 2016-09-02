@@ -15,10 +15,15 @@ static bool emcuetiti_port_remote_readpacket(
 	libmqtt_readpkt(pkt, NULL, portdata->config->hostops->read,
 			portdata->connectiondata, NULL, NULL);
 
-	if (pkt->state == LIBMQTT_PACKETREADSTATE_FINISHED)
-		printf("type %d\n", pkt->type);
+	bool packetfinished = pkt->state >= LIBMQTT_PACKETREADSTATE_FINISHED;
 
-	return pkt->state == LIBMQTT_PACKETREADSTATE_FINISHED;
+	if (packetfinished) {
+		if (pkt->state == LIBMQTT_PACKETREADSTATE_FINISHED)
+			printf("type %d\n", pkt->type);
+		else if (pkt->state == LIBMQTT_PACKETREADSTATE_ERROR)
+			printf("error\n");
+	}
+	return packetfinished;
 }
 
 static void emcuetiti_port_remote_movetostate(
@@ -37,12 +42,18 @@ static void emcuetiti_port_remote_poll(emcuetiti_timestamp now, void* portdata) 
 
 	switch (data->state) {
 	case REMOTEPORTSTATE_NOTCONNECTED: {
-		int ret = config->hostops->connect(config->host, config->port,
-				&data->connectiondata);
-		if (ret == EMCUETITI_PORT_REMOTE_OK)
-			emcuetiti_port_remote_movetostate(data, REMOTEPORTSTATE_CONNECTING);
-		else if (ret == EMCUETITI_PORT_REMOTE_ERR)
-			emcuetiti_port_remote_movetostate(data, REMOTEPORTSTATE_ERROR);
+		emcuetiti_timestamp timesincelastattempt = now
+				- data->statedata.notconnected.lastattempt;
+		if (timesincelastattempt >= 10) {
+			data->statedata.notconnected.lastattempt = now;
+			int ret = config->hostops->connect(config->host, config->port,
+					&data->connectiondata);
+			if (ret == EMCUETITI_PORT_REMOTE_OK)
+				emcuetiti_port_remote_movetostate(data,
+						REMOTEPORTSTATE_CONNECTING);
+			else if (ret == EMCUETITI_PORT_REMOTE_ERR)
+				emcuetiti_port_remote_movetostate(data, REMOTEPORTSTATE_ERROR);
+		}
 	}
 		break;
 	case REMOTEPORTSTATE_CONNECTING: {
@@ -52,7 +63,9 @@ static void emcuetiti_port_remote_poll(emcuetiti_timestamp now, void* portdata) 
 
 				emcuetiti_port_remote_movetostate(data,
 						REMOTEPORTSTATE_CONNECTED);
+
 				data->statedata.connected.datalastsent = now;
+				data->statedata.connected.datalastreceived = now;
 			}
 		} else {
 			libmqtt_construct_connect(writefunc, data->connectiondata,
@@ -66,14 +79,32 @@ static void emcuetiti_port_remote_poll(emcuetiti_timestamp now, void* portdata) 
 		if (emcuetiti_port_remote_readpacket(data,
 				&data->statedata.connected.pktread)) {
 
+			if (data->statedata.connected.pktread.state
+					== LIBMQTT_PACKETREADSTATE_FINISHED)
+				data->statedata.connected.datalastreceived = now;
+			else if (data->statedata.connected.pktread.state
+					== LIBMQTT_PACKETREADSTATE_ERROR) {
+				emcuetiti_port_remote_movetostate(data, REMOTEPORTSTATE_ERROR);
+				break;
+			}
+
 		}
 
 		if (config->keepalive > 0) {
+			emcuetiti_timestamp timesincelastrecv = now
+					- data->statedata.connected.datalastreceived;
 			emcuetiti_timestamp timesincelastsend = now
 					- data->statedata.connected.datalastsent;
-			if (timesincelastsend >= data->config->keepalive) {
-				libmqtt_construct_pingreq(writefunc, data->connectiondata);
-				data->statedata.connected.datalastsent = now;
+
+			if (timesincelastrecv >= (data->config->keepalive * 2))
+				emcuetiti_port_remote_movetostate(data, REMOTEPORTSTATE_ERROR);
+			else {
+				bool sendping = timesincelastsend >= data->config->keepalive
+						|| timesincelastrecv >= data->config->keepalive;
+				if (sendping) {
+					libmqtt_construct_pingreq(writefunc, data->connectiondata);
+					data->statedata.connected.datalastsent = now;
+				}
 			}
 		}
 	}
@@ -81,6 +112,10 @@ static void emcuetiti_port_remote_poll(emcuetiti_timestamp now, void* portdata) 
 	case REMOTEPORTSTATE_DISCONNECTED:
 		break;
 	case REMOTEPORTSTATE_ERROR:
+		if (data->connectiondata != NULL) {
+			config->hostops->disconnect(data->connectiondata);
+			data->connectiondata = NULL;
+		}
 		break;
 	}
 

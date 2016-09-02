@@ -74,7 +74,7 @@ public class Remote extends BaseMQTTTest {
 
 
         try {
-            Thread.sleep((60 * 1000) * 10);
+            Thread.sleep((60 * 1000) * 2);
         } catch (InterruptedException ie) {
 
         }

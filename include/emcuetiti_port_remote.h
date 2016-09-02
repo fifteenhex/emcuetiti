@@ -50,16 +50,22 @@ typedef struct {
 } emcuetiti_port_remoteconfig;
 
 typedef struct {
-	bool connreqsent;
+	emcuetiti_timestamp lastattempt;
+} emcuetiti_port_remote_statedata_notconnected;
+
+typedef struct {
 	libmqtt_packetread pktread;
+	bool connreqsent;
 } emcuetiti_port_remote_statedata_connecting;
 
 typedef struct {
-	emcuetiti_timestamp datalastsent;
 	libmqtt_packetread pktread;
+	emcuetiti_timestamp datalastsent;
+	emcuetiti_timestamp datalastreceived;
 } emcuetiti_port_remote_statedata_connected;
 
 typedef union {
+	emcuetiti_port_remote_statedata_notconnected notconnected;
 	emcuetiti_port_remote_statedata_connecting connecting;
 	emcuetiti_port_remote_statedata_connected connected;
 } emcuetiti_port_remote_statedata;

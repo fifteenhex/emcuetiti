@@ -129,21 +129,36 @@ int remote_connect(const char* host, unsigned port, void** connectiondata) {
 		}
 	}
 
+	if (ret != EMCUETITI_PORT_REMOTE_OK)
+		g_object_unref(sock);
+
 	g_object_unref(addr);
 	g_object_unref(enumerator);
 	return ret;
 }
 
 int remote_disconnect(void* connectiondata) {
+	g_message("disconnecting remote socket");
+	GSocket* sock = (GSocket*) connectiondata;
+	g_socket_close(sock, NULL);
+	g_object_unref(sock);
 	return 0;
 }
 
 int remote_read(void* connectiondata, uint8_t* buffer, size_t len) {
+	GError* error = NULL;
 	GSocket* sock = (GSocket*) connectiondata;
-	int ret = g_socket_receive(sock, buffer, len, NULL, NULL);
+	int ret = g_socket_receive(sock, buffer, len, NULL, &error);
 
-	if (ret == G_IO_ERROR_WOULD_BLOCK)
-		ret = LIBMQTT_EWOULDBLOCK;
+	if (ret == 0)
+		ret = LIBMQTT_EREMOTEDISCONNECTED;
+	else if (error != NULL) {
+		if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_WOULD_BLOCK))
+			ret = LIBMQTT_EWOULDBLOCK;
+		else
+			ret = LIBMQTT_EFATAL;
+		g_error_free(error);
+	}
 
 	return ret;
 }
