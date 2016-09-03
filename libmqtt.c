@@ -270,7 +270,7 @@ int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 		payloadsz += 2 + strlen(subscriptions[i].topic) + 1;
 
 	uint8_t fixedheader[LIBMQTT_MAXIMUMFIXEDHEADERBYTES];
-	fixedheader[0] = LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_SUBSCRIBE, 0);
+	fixedheader[0] = LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_SUBSCRIBE, 2);
 
 	size_t remainingbytesfiedlen;
 	libmqtt_encodelength(fixedheader + 1, sizeof(fixedheader) - 1,

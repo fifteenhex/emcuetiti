@@ -17,6 +17,7 @@ import java.util.Properties;
 
 public class Remote extends BaseMQTTTest {
 
+    private static final String REMOTE_TOPIC = "/remote";
     private static final int REMOTE_PORT = 8992;
     private static final String REOTE_HOST = "127.0.0.1";
     private static final Server remoteBroker = new Server();
@@ -65,13 +66,12 @@ public class Remote extends BaseMQTTTest {
 
     @Test
     public void fromRemote() {
-        /*String payload = "fromremote";
-        try {
-            remoteClient.publish("/bleh", payload.getBytes(), QoS.AT_MOST_ONCE, false);
+        String payload = "fromremote";
+       /* try {
+            remoteClient.publish(REMOTE_TOPIC, payload.getBytes(), QoS.AT_MOST_ONCE, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }*/
-
 
         try {
             Thread.sleep((60 * 1000) * 2);

@@ -214,6 +214,9 @@ int main(int argc, char** argv) {
 		emcuetiti_porthandle routerport;
 		emcuetiti_port_router(&broker, &routerport);
 
+		libmqtt_subscription remotesubs[] = { { .topic = "/remote", .qos =
+				LIBMQTT_QOS0_ATMOSTONCE } };
+
 		emcuetiti_port_remote_hostops remotehostops = { //
 				.connect = remote_connect, //
 						.disconnect = remote_disconnect, //
@@ -224,7 +227,8 @@ int main(int argc, char** argv) {
 						.port = 8992, //
 						.clientid = "remoteclient", //
 						.keepalive = 10, //
-						.hostops = &remotehostops };
+						.hostops = &remotehostops, //
+						.topics = remotesubs, .numtopics = 1 };
 		emcuetiti_porthandle remoteport;
 		emcuetiti_port_remote_portdata remoteportdata;
 

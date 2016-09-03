@@ -30,12 +30,12 @@ typedef struct {
 } emcuetiti_port_remote_hostops;
 
 typedef enum {
-	REMOTEPORTSTATE_NOTCONNECTED,
-	REMOTEPORTSTATE_CONNECTING,
-	REMOTEPORTSTATE_SUBSCRIBING,
-	REMOTEPORTSTATE_CONNECTED,
-	REMOTEPORTSTATE_DISCONNECTED,
-	REMOTEPORTSTATE_ERROR
+	REMOTEPORTSTATE_NOTCONNECTED,	// socket is not yet connected
+	REMOTEPORTSTATE_CONNECTING,		// mqtt is connecting
+	REMOTEPORTSTATE_SUBSCRIBING,	// subscribing to topics
+	REMOTEPORTSTATE_READY,			// connected, subscribed, normal state
+	REMOTEPORTSTATE_DISCONNECTED,	//
+	REMOTEPORTSTATE_ERROR			// something bad happened
 } emcuetiti_port_remote_state;
 
 typedef struct {
@@ -43,6 +43,8 @@ typedef struct {
 	const unsigned port;		// port on host
 	const char* clientid;		// clientid
 	unsigned keepalive;			// keepalive timeout
+	libmqtt_subscription* topics;		// topics to subscribe to
+	unsigned numtopics;			// number of topics pointed to by the above
 #if EMCUETITI_CONFIG_HAVETLS
 	void* tlsconfig; // if using tls this should point to a tls config, else null
 #endif
@@ -55,19 +57,27 @@ typedef struct {
 
 typedef struct {
 	libmqtt_packetread pktread;
+	emcuetiti_timestamp connsentat;
 	bool connreqsent;
 } emcuetiti_port_remote_statedata_connecting;
 
 typedef struct {
 	libmqtt_packetread pktread;
+	bool subreqsent;
+	emcuetiti_timestamp subreqsentat;
+} emcuetiti_port_remote_statedata_subscribing;
+
+typedef struct {
+	libmqtt_packetread pktread;
 	emcuetiti_timestamp datalastsent;
 	emcuetiti_timestamp datalastreceived;
-} emcuetiti_port_remote_statedata_connected;
+} emcuetiti_port_remote_statedata_ready;
 
 typedef union {
 	emcuetiti_port_remote_statedata_notconnected notconnected;
 	emcuetiti_port_remote_statedata_connecting connecting;
-	emcuetiti_port_remote_statedata_connected connected;
+	emcuetiti_port_remote_statedata_subscribing subscribing;
+	emcuetiti_port_remote_statedata_ready ready;
 } emcuetiti_port_remote_statedata;
 
 typedef struct {
