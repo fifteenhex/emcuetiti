@@ -100,7 +100,8 @@ int libmqtt_decodelength(uint8_t* buffer, size_t* len) {
 
 int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t keepalive, const char* clientid, const char* willtopic,
-		const char* willmessage, const char* username, const char* password) {
+		const char* willmessage, const char* username, const char* password,
+		bool cleansession) {
 
 	uint8_t flags = 0;
 	size_t clientidlen = strlen(clientid);
@@ -130,6 +131,10 @@ int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
 		payloadsz += passwordlen;
 	}
 
+	if (cleansession) {
+		flags |= LIBMQTT_FLAGS_CONNECT_CLEANSESSION;
+	}
+
 	libmqtt_connect_variableheader varhead = {
 			.lengthmsb = 0, //
 			.lengthlsb = 4, //
@@ -146,7 +151,7 @@ int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
 			sizeof(varhead) + payloadsz, &remainingbytensfieldlen);
 	size_t fixedheadersz = 1 + remainingbytensfieldlen;
 
-	// write out the packet
+// write out the packet
 
 	writefunc(userdata, fixedheader, fixedheadersz);
 
@@ -212,16 +217,16 @@ int libmqtt_construct_publish(
 			LIBMQTT_MQTTSTRLEN(topiclen) + (needsid ? sizeof(messageid) : 0)
 					+ payloadlen, &remainingbytesfiedlen);
 
-	// fixed header
+// fixed header
 	writefunc(writeuserdata, fixedheader, 1 + remainingbytesfiedlen);
 
-	// var header
+// var header
 	libmqtt_appendlengthandstring_writer(writefunc, writeuserdata, topicwriter,
 			topicdata, topiclen);
 	if (needsid)
 		writefunc(writeuserdata, (uint8_t*) &messageid, sizeof(messageid));
 
-	// payload
+// payload
 	size_t payloadremaining = payloadlen;
 	uint8_t buffer[32];
 	while (payloadremaining > 0) {
@@ -259,11 +264,12 @@ int libmqtt_construct_pubcomp(libmqtt_writefunc writefunc, void* userdata) {
 }
 
 int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
-		libmqtt_subscription* subscriptions, int numsubscriptions) {
+		libmqtt_subscription* subscriptions, int numsubscriptions,
+		uint16_t messageid) {
 
-	libmqtt_messageid_variableheader varheader = {
-
-	};
+	libmqtt_messageid_variableheader varheader = { //
+			.packetidmsb = (messageid >> 8) & 0xff, //
+					.packetidlsb = messageid & 0xff };
 
 	size_t payloadsz = 0;
 	for (int i = 0; i < numsubscriptions; i++)
@@ -374,7 +380,7 @@ int libmqtt_readpkt_changestate(libmqtt_packetread* pkt,
 	pkt->counter = 0;
 	pkt->state = newstate;
 
-	// if all of the packet has been read move to finished instead of the next state
+// if all of the packet has been read move to finished instead of the next state
 	if (pkt->state > LIBMQTT_PACKETREADSTATE_LEN
 			&& pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED)
 		if (pkt->pos == pkt->length)
@@ -393,7 +399,7 @@ int libmqtt_readpkt_read(libmqtt_packetread* pkt, libmqtt_readfunc readfunc,
 		pkt->pos += ret;
 		pkt->counter += ret;
 	}
-	//printf("read: %d\n", ret);
+//printf("read: %d\n", ret);
 	return ret;
 }
 
@@ -404,7 +410,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 
 	int ret = 0;
 
-	// reset a finished or error'd packet
+// reset a finished or error'd packet
 	if (pkt->state >= LIBMQTT_PACKETREADSTATE_FINISHED)
 		memset(pkt, 0, sizeof(*pkt));
 

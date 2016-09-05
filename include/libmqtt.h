@@ -30,12 +30,6 @@ typedef enum {
 #define LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(tf) ((tf >> LIBMQTT_PACKETTYPE_SHIFT) & 0xf)
 #define LIBMQTT_PACKETFLAGSFROMPACKETTYPEANDFLAGS(tf) (tf & 0xf)
 
-#define LIBMQTT_CONNECTFLAG_CLEANSESSION	(1 << 1)
-#define LIBMQTT_CONNECTFLAG_WILL			(1 << 2)
-#define LIBMQTT_CONNECTFLAG_WILLRETAIN		(1 << 5)
-#define LIBMQTT_CONNECTFLAG_PASSWORD		(1 << 6)
-#define LIBMQTT_CONNECTFLAG_USERNAME		(1 << 7)
-
 #define LIBMQTT_CONNECTRETURNCODE_ACCEPTED						0
 #define LIBMQTT_CONNECTRETURNCODE_UNACCEPTABLEPROTOCOLVERSION	1
 #define LIBMQTT_CONNECTRETURNCODE_IDENTIFIERREJECTED			2
@@ -60,6 +54,12 @@ typedef struct {
 	const char* topic;
 	uint8_t qos;
 } libmqtt_subscription;
+
+typedef struct {
+	const libmqtt_subscription* subs;
+	uint8_t* results;
+	unsigned numsubs;
+} libmqtt_subtransaction;
 
 typedef enum {
 	LIBMQTT_PACKETREADSTATE_TYPE,		// packet type
@@ -117,7 +117,8 @@ int libmqtt_encodelength(uint8_t* buffer, size_t bufferlen, size_t len,
 
 int libmqtt_construct_connect(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t keepalive, const char* clientid, const char* willtopic,
-		const char* willmessage, const char* username, const char* password);
+		const char* willmessage, const char* username, const char* password,
+		bool cleansession);
 
 int libmqtt_construct_connack(libmqtt_writefunc writefunc, void* userdata);
 
@@ -136,7 +137,8 @@ int libmqtt_construct_puback(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t messageid);
 
 int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
-		libmqtt_subscription* subscriptions, int numsubscriptions);
+		libmqtt_subscription* subscriptions, int numsubscriptions,
+		uint16_t messageid);
 
 int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t id, uint8_t* returncodes, int numreturncodes);

@@ -38,6 +38,13 @@ typedef enum {
 	REMOTEPORTSTATE_ERROR			// something bad happened
 } emcuetiti_port_remote_state;
 
+typedef enum {
+	REMOTEPORTSTATE_READY_READ,
+	REMOTEPORTSTATE_READY_WRITE,
+	REMOTEPORTSTATE_READY_KEEPALIVE,
+	REMOTEPORTSTATE_READY_END
+} emcuetiti_port_remote_readystate;
+
 typedef struct {
 	const char* host; 			// host to connect to
 	const unsigned port;		// port on host
@@ -65,9 +72,11 @@ typedef struct {
 	libmqtt_packetread pktread;
 	bool subreqsent;
 	emcuetiti_timestamp subreqsentat;
+	uint16_t msgid;
 } emcuetiti_port_remote_statedata_subscribing;
 
 typedef struct {
+	emcuetiti_port_remote_readystate state;
 	libmqtt_packetread pktread;
 	emcuetiti_timestamp datalastsent;
 	emcuetiti_timestamp datalastreceived;
@@ -86,6 +95,7 @@ typedef struct {
 	emcuetiti_port_remote_statedata statedata;
 	void* connectiondata;
 	uint8_t buffer[32];
+	uint16_t msgid;
 } emcuetiti_port_remote_portdata;
 
 void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,
