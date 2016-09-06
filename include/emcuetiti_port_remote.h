@@ -94,8 +94,9 @@ typedef struct {
 	emcuetiti_port_remote_state state;
 	emcuetiti_port_remote_statedata statedata;
 	void* connectiondata;
-	uint8_t buffer[32];
 	uint16_t msgid;
+
+	libmqtt_bufferhandle buffer;
 } emcuetiti_port_remote_portdata;
 
 void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,

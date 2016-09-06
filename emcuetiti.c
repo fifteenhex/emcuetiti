@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "libmqtt.h"
+#include "libmqtt_priv.h"
 
 #include "emcuetiti_priv.h"
 #include "emcuetiti.h"
@@ -323,15 +324,15 @@ static void emcuetiti_handleinboardpacket_connect(
 	cs->clientid[idlen] = '\0';
 	buff += idlen;
 
-	if (flags & LIBMQTT_CONNECTFLAG_WILL) {
+	if (flags & LIBMQTT_FLAGS_CONNECT_WILLFLAG) {
 
 	}
 
-	if (flags & LIBMQTT_CONNECTFLAG_USERNAME) {
+	if (flags & LIBMQTT_FLAGS_CONNECT_USERNAMEFLAG) {
 
 	}
 
-	if (flags & LIBMQTT_CONNECTFLAG_PASSWORD) {
+	if (flags & LIBMQTT_FLAGS_CONNECT_PASSWORDFLAG) {
 
 	}
 

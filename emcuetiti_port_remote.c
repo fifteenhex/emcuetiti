@@ -18,10 +18,34 @@ static void emcuetiti_port_remote_movetostate(
 	printf("s:%d\n", newstate);
 }
 
+static int emcuetiti_port_remote_readpacket_writer(void* userdata,
+		const uint8_t* buffer, size_t len) {
+	emcuetiti_port_remote_portdata* portdata =
+			(emcuetiti_port_remote_portdata*) userdata;
+	printf("wr: %c[%02x]\n", buffer[0], buffer[0]);
+	return 1;
+}
+
+static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt) {
+	printf("ps:%d\n", (int) pkt->state);
+
+	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_TOPIC:
+		printf("tl:%u\n", pkt->varhdr.publish.topiclen);
+		break;
+	case LIBMQTT_PACKETREADSTATE_PAYLOAD:
+		printf("pl:%u\n", pkt->length - pkt->pos);
+		break;
+	}
+
+	return LIBMQTT_EWOULDBLOCK;
+}
+
 static bool emcuetiti_port_remote_readpacket(
 		emcuetiti_port_remote_portdata* portdata, libmqtt_packetread* pkt) {
-	libmqtt_readpkt(pkt, NULL, portdata->config->hostops->read,
-			portdata->connectiondata, NULL, NULL);
+	libmqtt_readpkt(pkt, emcuetiti_port_remote_readpacket_statechange,
+			portdata->config->hostops->read, portdata->connectiondata,
+			emcuetiti_port_remote_readpacket_writer, portdata);
 
 	bool ret = false;
 
@@ -64,7 +88,6 @@ static void emcuetiti_port_remote_errorontimeout(emcuetiti_timestamp then,
 
 static void emcuetiti_port_remote_state_notconnected(emcuetiti_timestamp now,
 		emcuetiti_port_remote_portdata* data) {
-
 	const emcuetiti_port_remoteconfig* config = data->config;
 
 	emcuetiti_timestamp timesincelastattempt = now
@@ -78,12 +101,10 @@ static void emcuetiti_port_remote_state_notconnected(emcuetiti_timestamp now,
 		else if (ret == EMCUETITI_PORT_REMOTE_ERR)
 			emcuetiti_port_remote_movetostate(data, REMOTEPORTSTATE_ERROR);
 	}
-
 }
 
 static void emcuetiti_port_remote_state_connecting(emcuetiti_timestamp now,
 		emcuetiti_port_remote_portdata* data) {
-
 	const emcuetiti_port_remoteconfig* config = data->config;
 	emcuetiti_port_remote_statedata_connecting* statedata =
 			&data->statedata.connecting;

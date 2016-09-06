@@ -392,14 +392,52 @@ int libmqtt_readpkt_changestate(libmqtt_packetread* pkt,
 	return ret;
 }
 
+static void libmqtt_readpkt_incposandcounter(libmqtt_packetread* pkt, int by) {
+	pkt->pos += by;
+	pkt->counter += by;
+}
+
 int libmqtt_readpkt_read(libmqtt_packetread* pkt, libmqtt_readfunc readfunc,
 		void* readuserdata, void* buff, size_t len) {
 	int ret = readfunc(readuserdata, buff, len);
-	if (ret > 0) {
-		pkt->pos += ret;
-		pkt->counter += ret;
+	if (ret > 0)
+		libmqtt_readpkt_incposandcounter(pkt, ret);
+	return ret;
+}
+
+int libmqtt_buffer_flush(libmqtt_bufferhandle* buffer,
+		libmqtt_writefunc writefunc, void* userdata) {
+
+	int ret = 0;
+	if (buffer->writepos != 0) {
+		if (writefunc != NULL) {
+			size_t writesz = buffer->writepos - buffer->readpos;
+			ret = writefunc(userdata, buffer->buffer + buffer->readpos,
+					writesz);
+			if (ret > 0)
+				buffer->readpos += ret;
+		} else
+			buffer->readpos = buffer->writepos;
+
+		if (buffer->readpos == buffer->writepos) {
+			buffer->readpos = 0;
+			buffer->writepos = 0;
+		}
 	}
-//printf("read: %d\n", ret);
+	return ret;
+}
+
+int libmqtt_buffer_fill(libmqtt_bufferhandle* buffer, size_t waiting,
+		libmqtt_readfunc readfunc, void* userdata) {
+	int ret = 0;
+	if (buffer->writepos == 0) {
+		size_t readsz =
+				waiting < sizeof(buffer->buffer) ?
+						waiting : sizeof(buffer->buffer);
+		ret = readfunc(userdata, buffer->buffer, readsz);
+		if (ret > 0)
+			buffer->writepos = ret;
+	}
 	return ret;
 }
 
@@ -429,6 +467,8 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 				// check for valid packet type
 				if (pkt->type >= LIBMQTT_PACKETTYPE_CONNECT
 						&& pkt->type <= LIBMQTT_PACKETTYPE_DISCONNECT) {
+					pkt->flags = LIBMQTT_PACKETFLAGSFROMPACKETTYPEANDFLAGS(
+							typeandflags);
 					pkt->length = 1;
 					pkt->lenmultiplier = 1;
 					libmqtt_readpkt_changestate(pkt, changefunc,
@@ -481,8 +521,8 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata,
 					&topiclenbyte, 1);
 			if (ret == 1) {
-				pkt->varhdr.topiclen = (pkt->varhdr.topiclen << 8)
-						| topiclenbyte;
+				pkt->varhdr.publish.topiclen = (pkt->varhdr.publish.topiclen
+						<< 8) | topiclenbyte;
 				if (pkt->counter == 2)
 					libmqtt_readpkt_changestate(pkt, changefunc,
 							LIBMQTT_PACKETREADSTATE_TOPIC);
@@ -494,9 +534,13 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &topicbyte,
 					1);
 			if (ret == 1) {
-				if (pkt->counter == pkt->varhdr.topiclen)
+				if (pkt->counter == pkt->varhdr.publish.topiclen) {
+					bool publishhasmsgid = ((pkt->flags >> 1) & 0x3);
 					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_MSGID);
+							publishhasmsgid ?
+									LIBMQTT_PACKETREADSTATE_MSGID :
+									LIBMQTT_PACKETREADSTATE_PAYLOAD);
+				}
 			};
 		}
 			break;
@@ -535,24 +579,28 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 		}
 			break;
 		case LIBMQTT_PACKETREADSTATE_PAYLOAD: {
-			uint8_t buff[32];
-			size_t readsz = sizeof(buff);
+			// try to read
 			size_t remaining = pkt->length - pkt->pos;
-			if (remaining < readsz)
-				readsz = remaining;
-			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, buff,
-					readsz);
-			if (ret > 0) {
-				libmqtt_readpkt_changestate(pkt, changefunc,
-						LIBMQTT_PACKETREADSTATE_PAYLOAD);
-			}
+			ret = libmqtt_buffer_fill(&pkt->buffer, remaining, readfunc,
+					readuserdata);
+			if (ret < 0)
+				break;
+
+			// try to flush
+			ret = libmqtt_buffer_flush(&pkt->buffer, payloadwritefunc,
+					payloadwriteuserdata);
+			if (ret > 0)
+				libmqtt_readpkt_incposandcounter(pkt, ret);
+
+			libmqtt_readpkt_changestate(pkt, changefunc,
+					LIBMQTT_PACKETREADSTATE_PAYLOAD);
 		}
 			break;
 		}
 
 	}
 
-	if (ret == LIBMQTT_EFATAL)
+	if (ret <= LIBMQTT_EFATAL)
 		libmqtt_readpkt_changestate(pkt, changefunc,
 				LIBMQTT_PACKETREADSTATE_ERROR);
 

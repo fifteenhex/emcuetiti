@@ -45,9 +45,13 @@ typedef enum {
 #define LIBMQTT_LEN(b) (b & ~(1 << 7))
 #define LIBMQTT_ISLASTLENBYTE(b) ((b & (1 << 7)) == 0)
 
+// errors
+// non-fatal
 #define LIBMQTT_EWOULDBLOCK			-1
-#define LIBMQTT_EREMOTEDISCONNECTED	-2
-#define LIBMQTT_EFATAL				-3
+// fatal
+#define LIBMQTT_EFATAL				-2
+#define LIBMQTT_EREMOTEDISCONNECTED	-3
+#define LIBMQTT_ETOOBIG				-4
 
 // types
 typedef struct {
@@ -82,11 +86,22 @@ typedef struct {
 	uint8_t returncode;
 } libmqtt_packet_connack;
 
-typedef union {
+typedef struct {
 	uint16_t msgid;
 	uint16_t topiclen;
+} libmqtt_packet_publish;
+
+typedef union {
+	uint16_t msgid;
 	libmqtt_packet_connack connack;
+	libmqtt_packet_publish publish;
 } libmqtt_packetread_varhdr;
+
+typedef struct {
+	size_t writepos;
+	size_t readpos;
+	uint8_t buffer[64];
+} libmqtt_bufferhandle;
 
 typedef struct {
 	libmqtt_packetread_state state;
@@ -98,6 +113,7 @@ typedef struct {
 	size_t pos;
 	unsigned lenmultiplier;
 	uint8_t counter;
+	libmqtt_bufferhandle buffer;
 } libmqtt_packetread;
 
 // callbacks
