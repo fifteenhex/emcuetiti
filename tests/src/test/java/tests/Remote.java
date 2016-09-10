@@ -26,15 +26,18 @@ import java.util.concurrent.TimeoutException;
 
 public class Remote extends BaseMQTTTest {
 
-    private static final String REMOTE_TOPIC = "/remote";
+    private static final String REMOTEBROKERTOPIC = "/remote/client";
+    private static final String REMOTEIN_TOPIC = "/remote/in";
     private static final int REMOTE_PORT = 8992;
-    private static final String REOTE_HOST = "127.0.0.1";
+    private static final String REMOTE_HOST = "127.0.0.1";
     private static final Server remoteBroker = new Server();
     private static BlockingConnection remoteClient;
 
     private static final String REMOTECLIENTID = "remoteclient";
     private static SettableFuture<Boolean> emcuetitiConnected = SettableFuture.create();
     private static SettableFuture<Boolean> emcuetitiSubbed = SettableFuture.create();
+
+    private static BlockingConnection localClient;
 
     private static InterceptHandler handler = new InterceptHandler() {
         @Override
@@ -67,6 +70,20 @@ public class Remote extends BaseMQTTTest {
     };
 
     @BeforeClass
+    public static void startClient() {
+        localClient = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT);
+    }
+
+    @AfterClass
+    public static void stopClient() {
+        try {
+            localClient.disconnect();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @BeforeClass
     public static void startRemoteBroker() {
         log("starting remote broker...");
 
@@ -74,7 +91,7 @@ public class Remote extends BaseMQTTTest {
         handlers.add(handler);
 
         Properties props = new Properties();
-        props.put(BrokerConstants.HOST_PROPERTY_NAME, REOTE_HOST);
+        props.put(BrokerConstants.HOST_PROPERTY_NAME, REMOTE_HOST);
         props.put(BrokerConstants.PORT_PROPERTY_NAME, Integer.toString(REMOTE_PORT));
 
         try {
@@ -83,26 +100,8 @@ public class Remote extends BaseMQTTTest {
             throw new RuntimeException(ioe);
         }
 
-        final MQTT mqttClient = new MQTT();
-        try {
-            mqttClient.setHost(REOTE_HOST, REMOTE_PORT);
-            mqttClient.setConnectAttemptsMax(1);
-            mqttClient.setReconnectAttemptsMax(0);
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
 
-
-        remoteClient = mqttClient.blockingConnection();
-        try {
-            remoteClient.connect();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-
-
+        remoteClient = createBlockingConnection(REMOTE_HOST, REMOTE_PORT);
     }
 
     @AfterClass
@@ -131,7 +130,7 @@ public class Remote extends BaseMQTTTest {
 
         String payload = "fromremote";
         try {
-            remoteClient.publish(REMOTE_TOPIC, payload.getBytes(), QoS.AT_MOST_ONCE, false);
+            remoteClient.publish(REMOTEBROKERTOPIC, payload.getBytes(), QoS.AT_MOST_ONCE, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

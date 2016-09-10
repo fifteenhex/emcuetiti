@@ -16,8 +16,8 @@ import org.junit.BeforeClass;
 public class BaseMQTTTest {
 
     private static final boolean STARTBROKER = false;
-    private static final String MQTT_HOSTNAME = "localhost";
-    private static final int MQTT_PORT = 8991;
+    protected static final String MQTT_HOSTNAME = "localhost";
+    protected static final int MQTT_PORT = 8991;
     private static final int MQTT_CLIENTS = 2;
 
 
@@ -32,6 +32,27 @@ public class BaseMQTTTest {
         System.out.println(message);
     }
 
+
+    public static BlockingConnection createBlockingConnection(String host, int port) {
+        final MQTT mqttClient = new MQTT();
+        try {
+            mqttClient.setHost(MQTT_HOSTNAME, MQTT_PORT);
+            mqttClient.setConnectAttemptsMax(1);
+            mqttClient.setReconnectAttemptsMax(0);
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+
+        final BlockingConnection mqttConnection = mqttClient.blockingConnection();
+        try {
+            mqttConnection.connect();
+            return mqttConnection;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
 
     @BeforeClass
     public static void startBrokerAndCreateClients() {
@@ -50,27 +71,10 @@ public class BaseMQTTTest {
 
         log("Creating clients...");
 
-        final MQTT mqttClient = new MQTT();
-        try {
-            mqttClient.setHost(MQTT_HOSTNAME, MQTT_PORT);
-            mqttClient.setConnectAttemptsMax(1);
-            mqttClient.setReconnectAttemptsMax(0);
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
 
-        for (int c = 0; c < MQTT_CLIENTS; c++) {
-            final BlockingConnection mqttConnection = mqttClient.blockingConnection();
-            try {
-                mqttConnection.connect();
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new RuntimeException(e);
-            }
+        for (int c = 0; c < MQTT_CLIENTS; c++)
+            mqttConnections[c] = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT);
 
-            mqttConnections[c] = mqttConnection;
-        }
     }
 
     @AfterClass
