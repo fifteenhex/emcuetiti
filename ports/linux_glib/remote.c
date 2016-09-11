@@ -1,7 +1,22 @@
 #include <gio/gio.h>
 #include <emcuetiti_port_remote.h>
 
+#include "commandline.h"
 #include "remote.h"
+#include "broker.h"
+
+static gboolean remote_socketcallback(GSocket *socket, GIOCondition condition,
+		gpointer data) {
+
+}
+
+static void remote_wireupsocketcallback(GSocket *socket) {
+	//GSource* clientsocketsource = g_socket_create_source(socket, G_IO_IN,
+	//NULL);
+	//g_source_attach(clientsocketsource, NULL);
+	//g_source_set_callback(clientsocketsource, , &broker,
+	//NULL);
+}
 
 static int remote_connect(const char* host, unsigned port,
 		void** connectiondata) {
@@ -22,6 +37,7 @@ static int remote_connect(const char* host, unsigned port,
 		if (g_socket_connect(sock, sockaddr, NULL, &error)) {
 			g_message("connected");
 			g_socket_set_blocking(sock, FALSE);
+			remote_wireupsocketcallback(sock);
 			*connectiondata = sock;
 			ret = EMCUETITI_PORT_REMOTE_OK;
 			break;
@@ -69,9 +85,6 @@ static int remote_write(void* connectiondata, const uint8_t* buffer, size_t len)
 	return g_socket_send(sock, buffer, len, NULL, NULL);
 }
 
-libmqtt_subscription remotesubs[] = { { .topic = "/remote", .qos =
-		LIBMQTT_QOS0_ATMOSTONCE } };
-
 static const emcuetiti_port_remote_hostops remotehostops = { //
 		.connect = remote_connect, //
 				.disconnect = remote_disconnect, //
@@ -79,17 +92,34 @@ static const emcuetiti_port_remote_hostops remotehostops = { //
 				.write = remote_write };
 
 static emcuetiti_port_remoteconfig remoteconfig = { //
-		.host = "localhost", //
-				.port = 8992, //
-				.clientid = "remoteclient", //
-				.keepalive = 10, //
-				.hostops = &remotehostops, //
-				.topics = remotesubs, .numtopics = 1 };
+		.clientid = "remoteclient", //
+				.hostops = &remotehostops };
+
 static emcuetiti_porthandle remoteport;
 static emcuetiti_port_remote_portdata remoteportdata;
 
 int remote_init(emcuetiti_brokerhandle* broker) {
-	emcuetiti_port_remote_new(broker, &remoteconfig, &remoteport,
-			&remoteportdata);
+	if (commandline_remote_host != NULL) {
+		remoteconfig.host = commandline_remote_host;
+		remoteconfig.port = commandline_remote_port;
+		remoteconfig.keepalive = commandline_remote_keepalive;
+
+		int numtopics = 0;
+		for (gchar** t = commandline_remote_topics; t != NULL; t++)
+			numtopics++;
+
+		remoteconfig.numtopics = numtopics;
+		remoteconfig.topics = g_malloc(
+				sizeof(libmqtt_subscription) * numtopics);
+
+		for (int i = 0; i < remoteconfig.numtopics; i++) {
+			libmqtt_subscription* sub = &remoteconfig.topics[i];
+			sub->topic = commandline_remote_topics[i];
+			sub->qos = LIBMQTT_QOS0_ATMOSTONCE;
+		}
+
+		emcuetiti_port_remote_new(broker, &remoteconfig, &remoteport,
+				&remoteportdata);
+	}
 	return 0;
 }

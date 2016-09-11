@@ -11,8 +11,8 @@ $(OUTPUTDIR)/libemcuetiti.a
 $(OUTPUTDIR)/$(OUTPUTPREFIX)commandline.o: commandline.c commandline.h
 	$(CC) $(CFLAGS) $(LFLAGS) -c -o $@ $<
 
-$(OUTPUTDIR)/$(OUTPUTPREFIX)broker.o: broker.c broker.h
+$(OUTPUTDIR)/$(OUTPUTPREFIX)broker.o: broker.c broker.h commandline.h
 	$(CC) $(CFLAGS) $(LFLAGS) -c -o $@ $<
 	
-$(OUTPUTDIR)/$(OUTPUTPREFIX)remote.o: remote.c remote.h
+$(OUTPUTDIR)/$(OUTPUTPREFIX)remote.o: remote.c remote.h commandline.h
 	$(CC) $(CFLAGS) $(LFLAGS) -c -o $@ $<

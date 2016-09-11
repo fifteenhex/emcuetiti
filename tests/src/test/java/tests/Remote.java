@@ -10,6 +10,7 @@ import io.moquette.server.config.MemoryConfig;
 import org.fusesource.mqtt.client.BlockingConnection;
 import org.fusesource.mqtt.client.MQTT;
 import org.fusesource.mqtt.client.QoS;
+import org.fusesource.mqtt.client.Topic;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -26,8 +27,8 @@ import java.util.concurrent.TimeoutException;
 
 public class Remote extends BaseMQTTTest {
 
-    private static final String REMOTEBROKERTOPIC = "/remote/client";
-    private static final String REMOTEIN_TOPIC = "/remote/in";
+    private static final String TOPICLOCALTOREMOTE = "/remote/localtoremote";
+    private static final String TOPICREMOTETOLOCAL = "/remote/remotetolocal";
     private static final int REMOTE_PORT = 8992;
     private static final String REMOTE_HOST = "127.0.0.1";
     private static final Server remoteBroker = new Server();
@@ -71,7 +72,7 @@ public class Remote extends BaseMQTTTest {
 
     @BeforeClass
     public static void startClient() {
-        localClient = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT);
+        localClient = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT, TOPICREMOTETOLOCAL);
     }
 
     @AfterClass
@@ -101,7 +102,7 @@ public class Remote extends BaseMQTTTest {
         }
 
 
-        remoteClient = createBlockingConnection(REMOTE_HOST, REMOTE_PORT);
+        //remoteClient = createBlockingConnection(REMOTE_HOST, REMOTE_PORT, TOPICLOCALTOREMOTE);
     }
 
     @AfterClass
@@ -123,17 +124,17 @@ public class Remote extends BaseMQTTTest {
 
 
     @Test
-    public void fromRemote() {
+    public void basic() {
 
         getBoolFuture(emcuetitiConnected);
         getBoolFuture(emcuetitiSubbed);
 
-        String payload = "fromremote";
+        /*String payload = "fromremote";
         try {
-            remoteClient.publish(REMOTEBROKERTOPIC, payload.getBytes(), QoS.AT_MOST_ONCE, false);
+            remoteClient.publish(TOPICREMOTETOLOCAL, payload.getBytes(), QoS.AT_MOST_ONCE, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
+        }*/
 
         try {
             Thread.sleep((60 * 1000) * 20);
@@ -142,8 +143,5 @@ public class Remote extends BaseMQTTTest {
         }
     }
 
-    @Test
-    public void toRemote() {
 
-    }
 }

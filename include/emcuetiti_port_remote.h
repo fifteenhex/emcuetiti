@@ -46,9 +46,9 @@ typedef enum {
 } emcuetiti_port_remote_readystate;
 
 typedef struct {
-	const char* host; 			// host to connect to
-	const unsigned port;		// port on host
-	const char* clientid;		// clientid
+	char* host; 			// host to connect to
+	unsigned port;		// port on host
+	char* clientid;		// clientid
 	unsigned keepalive;			// keepalive timeout
 	libmqtt_subscription* topics;		// topics to subscribe to
 	unsigned numtopics;			// number of topics pointed to by the above

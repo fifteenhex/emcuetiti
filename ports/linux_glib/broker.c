@@ -53,14 +53,14 @@ static const emcuetiti_clientops gsocketclientops = { //
 				.readytoread = readytoread, //
 				.readfunc = gsocket_read };
 
-static uint32_t timestamp() {
-	gint64 now = g_get_monotonic_time() / 1000000;
-	return (uint32_t) now;
+static uint32_t broker_timestamp() {
+	uint32_t now = (uint32_t) (g_get_monotonic_time() / 1000000);
+	return now;
 }
 
 static const emcuetiti_brokerhandle_callbacks brokerops = { //
 		.authenticatecallback = NULL, //
-				.timestamp = timestamp, //
+				.timestamp = broker_timestamp, //
 				.writefunc = gsocket_write, //
 				.disconnectfunc = gsocket_disconnect };
 
@@ -70,7 +70,8 @@ static gboolean brokerpoll(gpointer data) {
 	return TRUE;
 }
 
-static gboolean serversocket_callback(gpointer data) {
+static gboolean serversocket_callback(GSocket *socket, GIOCondition condition,
+		gpointer data) {
 
 	emcuetiti_brokerhandle* broker = (emcuetiti_brokerhandle*) data;
 	brokerdata* bdata = (brokerdata*) broker->userdata;
@@ -153,7 +154,7 @@ int broker_init(GMainLoop* mainloop, emcuetiti_brokerhandle* broker) {
 		g_source_attach(serversocketsource, NULL);
 		g_source_set_callback(serversocketsource, serversocket_callback, broker,
 		NULL);
-		g_timeout_add(10, brokerpoll, broker);
+		g_timeout_add(2, brokerpoll, broker);
 
 		ret = 0;
 	} else

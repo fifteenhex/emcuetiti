@@ -4,6 +4,8 @@
 #include "emcuetiti_port_remote.h"
 #include "emcuetiti.h"
 
+#define TIMEOUT 30
+
 static int emcuetiti_port_remote_publishready(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* client, emcuetiti_topichandle* topic,
 		size_t payloadlen) {
@@ -76,7 +78,10 @@ static void emcuetiti_port_remote_nextstate(
 static bool emcuetiti_port_remote_timeoutexpired(emcuetiti_timestamp then,
 		emcuetiti_timestamp now, unsigned timeout) {
 	emcuetiti_timestamp elapsedtime = now - then;
-	return elapsedtime > timeout;
+	bool timedout = elapsedtime > timeout;
+	if (timedout)
+		printf("%u %u timeout\n", then, now);
+	return timedout;
 }
 
 static void emcuetiti_port_remote_errorontimeout(emcuetiti_timestamp then,
@@ -113,8 +118,8 @@ static void emcuetiti_port_remote_state_connecting(emcuetiti_timestamp now,
 		if (emcuetiti_port_remote_readpacket(data, &statedata->pktread)) {
 			emcuetiti_port_remote_nextstate(data);
 		} else
-			emcuetiti_port_remote_errorontimeout(statedata->connreqsent, now,
-					10, data);
+			emcuetiti_port_remote_errorontimeout(statedata->connsentat, now,
+			TIMEOUT, data);
 	} else {
 		libmqtt_construct_connect(config->hostops->write, data->connectiondata,
 				config->keepalive, config->clientid, NULL, NULL, NULL,
@@ -127,30 +132,34 @@ static void emcuetiti_port_remote_state_connecting(emcuetiti_timestamp now,
 static void emcuetiti_port_remote_state_subscribing(emcuetiti_timestamp now,
 		emcuetiti_port_remote_portdata* data) {
 
-	emcuetiti_port_remote_statedata_subscribing* statedata =
-			&data->statedata.subscribing;
+	if (data->config->numtopics > 0) {
+		emcuetiti_port_remote_statedata_subscribing* statedata =
+				&data->statedata.subscribing;
 
-	if (statedata->subreqsent) {
-		if (emcuetiti_port_remote_readpacket(data, &statedata->pktread)) {
-			if (statedata->pktread.type == LIBMQTT_PACKETTYPE_SUBACK
-					&& statedata->msgid == statedata->pktread.varhdr.msgid) {
-				emcuetiti_port_remote_nextstate(data);
-				data->statedata.ready.datalastsent = now;
-				data->statedata.ready.datalastreceived = now;
-			}
-		} else
-			emcuetiti_port_remote_errorontimeout(statedata->subreqsentat, now,
-					10, data);
-	} else {
-		libmqtt_construct_subscribe(data->config->hostops->write,
-				data->connectiondata, data->config->topics,
-				data->config->numtopics, data->msgid);
-		statedata->msgid = data->msgid;
-		statedata->subreqsent = true;
-		statedata->subreqsentat = now;
+		if (statedata->subreqsent) {
+			if (emcuetiti_port_remote_readpacket(data, &statedata->pktread)) {
+				if (statedata->pktread.type == LIBMQTT_PACKETTYPE_SUBACK
+						&& statedata->msgid
+								== statedata->pktread.varhdr.msgid) {
+					emcuetiti_port_remote_nextstate(data);
+					data->statedata.ready.datalastsent = now;
+					data->statedata.ready.datalastreceived = now;
+				}
+			} else
+				emcuetiti_port_remote_errorontimeout(statedata->subreqsentat,
+						now, 10, data);
+		} else {
+			libmqtt_construct_subscribe(data->config->hostops->write,
+					data->connectiondata, data->config->topics,
+					data->config->numtopics, data->msgid);
+			statedata->msgid = data->msgid;
+			statedata->subreqsent = true;
+			statedata->subreqsentat = now;
 
-		data->msgid++;
-	}
+			data->msgid++;
+		}
+	} else
+		emcuetiti_port_remote_nextstate(data);
 }
 
 static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
@@ -203,7 +212,6 @@ static void emcuetiti_port_remote_state_error(emcuetiti_timestamp now,
 static void emcuetiti_port_remote_poll(emcuetiti_timestamp now, void* portdata) {
 	emcuetiti_port_remote_portdata* data =
 			(emcuetiti_port_remote_portdata*) portdata;
-
 	switch (data->state) {
 	case REMOTEPORTSTATE_NOTCONNECTED:
 		emcuetiti_port_remote_state_notconnected(now, data);

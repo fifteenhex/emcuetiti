@@ -32,11 +32,14 @@ public class BaseMQTTTest {
         System.out.println(message);
     }
 
-
     public static BlockingConnection createBlockingConnection(String host, int port) {
+        return createBlockingConnection(host, port, null);
+    }
+
+    public static BlockingConnection createBlockingConnection(String host, int port, String topic) {
         final MQTT mqttClient = new MQTT();
         try {
-            mqttClient.setHost(MQTT_HOSTNAME, MQTT_PORT);
+            mqttClient.setHost(host, port);
             mqttClient.setConnectAttemptsMax(1);
             mqttClient.setReconnectAttemptsMax(0);
         } catch (URISyntaxException e) {
@@ -47,11 +50,22 @@ public class BaseMQTTTest {
         final BlockingConnection mqttConnection = mqttClient.blockingConnection();
         try {
             mqttConnection.connect();
-            return mqttConnection;
+
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
+
+        if (topic != null) {
+            Topic[] topics = new Topic[]{new Topic(topic, QoS.AT_MOST_ONCE)};
+            try {
+                mqttConnection.subscribe(topics);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        return mqttConnection;
     }
 
     @BeforeClass
