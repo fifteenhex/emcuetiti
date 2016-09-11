@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "buffers_types.h"
+
 typedef enum {
 	LIBMQTT_QOS0_ATMOSTONCE, LIBMQTT_QOS1_ATLEASTONCE, LIBMQTT_QOS2_EXACTLYONCE
 } libmqtt_qos;
@@ -98,12 +100,6 @@ typedef union {
 } libmqtt_packetread_varhdr;
 
 typedef struct {
-	size_t writepos;
-	size_t readpos;
-	uint8_t buffer[64];
-} libmqtt_bufferhandle;
-
-typedef struct {
 	libmqtt_packetread_state state;
 	uint8_t type;
 	uint8_t flags;
@@ -113,7 +109,7 @@ typedef struct {
 	size_t pos;
 	unsigned lenmultiplier;
 	uint8_t counter;
-	libmqtt_bufferhandle buffer;
+	BUFFERS_STATICBUFFER(buffer, 64);
 } libmqtt_packetread;
 
 // callbacks

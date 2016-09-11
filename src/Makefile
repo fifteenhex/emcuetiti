@@ -1,9 +1,16 @@
 include ../common.mk
 
-$(OUTPUTDIR)/libemcuetiti.a: $(OUTPUTDIR)/libmqtt.o $(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_port.o $(OUTPUTDIR)/emcuetiti_port_router.o $(OUTPUTDIR)/emcuetiti_port_remote.o 
+$(OUTPUTDIR)/libemcuetiti.a: $(OUTPUTDIR)/buffers.o \
+$(OUTPUTDIR)/libmqtt.o \
+$(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_port.o \
+$(OUTPUTDIR)/emcuetiti_port_router.o \
+$(OUTPUTDIR)/emcuetiti_port_remote.o 
 	$(AR) cr $@ $^
 
-$(OUTPUTDIR)/libmqtt.o: libmqtt.c $(INCLUDEDIR)/libmqtt.h $(INCLUDEDIR)/libmqtt_priv.h
+$(OUTPUTDIR)/buffers.o: buffers.c $(INCLUDEDIR)/buffers.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTPUTDIR)/libmqtt.o: libmqtt.c $(INCLUDEDIR)/libmqtt.h $(INCLUDEDIR)/libmqtt_priv.h $(INCLUDEDIR)/buffers.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTPUTDIR)/emcuetiti.o: emcuetiti.c $(INCLUDEDIR)/emcuetiti_config.h $(INCLUDEDIR)/emcuetiti_priv.h $(INCLUDEDIR)/emcuetiti.h

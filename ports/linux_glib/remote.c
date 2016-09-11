@@ -105,7 +105,7 @@ int remote_init(emcuetiti_brokerhandle* broker) {
 		remoteconfig.keepalive = commandline_remote_keepalive;
 
 		int numtopics = 0;
-		for (gchar** t = commandline_remote_topics; t != NULL; t++)
+		for (gchar** t = commandline_remote_topics; *t != NULL; t++)
 			numtopics++;
 
 		remoteconfig.numtopics = numtopics;

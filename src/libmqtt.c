@@ -4,6 +4,7 @@
 
 #include "libmqtt_priv.h"
 #include "libmqtt.h"
+#include "buffers.h"
 
 typedef struct {
 	const uint8_t lengthmsb;
@@ -405,42 +406,6 @@ int libmqtt_readpkt_read(libmqtt_packetread* pkt, libmqtt_readfunc readfunc,
 	return ret;
 }
 
-int libmqtt_buffer_flush(libmqtt_bufferhandle* buffer,
-		libmqtt_writefunc writefunc, void* userdata) {
-
-	int ret = 0;
-	if (buffer->writepos != 0) {
-		if (writefunc != NULL) {
-			size_t writesz = buffer->writepos - buffer->readpos;
-			ret = writefunc(userdata, buffer->buffer + buffer->readpos,
-					writesz);
-			if (ret > 0)
-				buffer->readpos += ret;
-		} else
-			buffer->readpos = buffer->writepos;
-
-		if (buffer->readpos == buffer->writepos) {
-			buffer->readpos = 0;
-			buffer->writepos = 0;
-		}
-	}
-	return ret;
-}
-
-int libmqtt_buffer_fill(libmqtt_bufferhandle* buffer, size_t waiting,
-		libmqtt_readfunc readfunc, void* userdata) {
-	int ret = 0;
-	if (buffer->writepos == 0) {
-		size_t readsz =
-				waiting < sizeof(buffer->buffer) ?
-						waiting : sizeof(buffer->buffer);
-		ret = readfunc(userdata, buffer->buffer, readsz);
-		if (ret > 0)
-			buffer->writepos = ret;
-	}
-	return ret;
-}
-
 int libmqtt_readpkt(libmqtt_packetread* pkt,
 		libmqtt_packetreadchange changefunc, libmqtt_readfunc readfunc,
 		void* readuserdata, libmqtt_writefunc payloadwritefunc,
@@ -581,13 +546,14 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 		case LIBMQTT_PACKETREADSTATE_PAYLOAD: {
 			// try to read
 			size_t remaining = pkt->length - pkt->pos;
-			ret = libmqtt_buffer_fill(&pkt->buffer, remaining, readfunc,
+			BUFFERS_STATICBUFFER_TO_BUFFER(pkt->buffer, pktbuffer);
+			ret = buffers_buffer_fill(&pktbuffer, remaining, readfunc,
 					readuserdata);
 			if (ret < 0)
 				break;
 
 			// try to flush
-			ret = libmqtt_buffer_flush(&pkt->buffer, payloadwritefunc,
+			ret = buffers_buffer_flush(&pktbuffer, payloadwritefunc,
 					payloadwriteuserdata);
 			if (ret > 0)
 				libmqtt_readpkt_incposandcounter(pkt, ret);

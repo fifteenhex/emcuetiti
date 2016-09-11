@@ -22,10 +22,19 @@ static void emcuetiti_port_remote_movetostate(
 
 static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 		const uint8_t* buffer, size_t len) {
+
+	int ret;
 	emcuetiti_port_remote_portdata* portdata =
 			(emcuetiti_port_remote_portdata*) userdata;
-	printf("wr: %c[%02x]\n", buffer[0], buffer[0]);
-	return 1;
+
+	if (portdata->statedata.ready.pktread.type == LIBMQTT_PACKETTYPE_PUBLISH) {
+		BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
+		ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
+	} else {
+		printf("wr: %c[%02x]\n", buffer[0], buffer[0]);
+		ret = 1;
+	}
+	return ret;
 }
 
 static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt) {
@@ -169,6 +178,7 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 		if (emcuetiti_port_remote_readpacket(data,
 				&data->statedata.ready.pktread)) {
 			data->statedata.ready.datalastreceived = now;
+
 			// if we have a keep alive set error out if no data has come in
 		} else if (data->config->keepalive > 0)
 			emcuetiti_port_remote_errorontimeout(
@@ -244,6 +254,9 @@ void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,
 	portdata->msgid = 0;
 	emcuetiti_port_remote_movetostate(portdata, REMOTEPORTSTATE_NOTCONNECTED);
 	port->portdata = portdata;
+
+	BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
+	buffers_buffer_reset(&pubbuff);
 
 	emcuetiti_port_register(broker, port);
 }

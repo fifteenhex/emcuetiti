@@ -1,6 +1,7 @@
 #pragma once
 
 #include "emcuetiti_types.h"
+#include "buffers.h"
 
 #define EMCUETITI_PORT_REMOTE_OK		0
 #define EMCUETITI_PORT_REMOTE_TRYAGAIN	-1
@@ -95,8 +96,7 @@ typedef struct {
 	emcuetiti_port_remote_statedata statedata;
 	void* connectiondata;
 	uint16_t msgid;
-
-	libmqtt_bufferhandle buffer;
+	BUFFERS_STATICBUFFER(publishbuffer, 1024);
 } emcuetiti_port_remote_portdata;
 
 void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,

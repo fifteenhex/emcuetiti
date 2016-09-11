@@ -102,7 +102,7 @@ public class Remote extends BaseMQTTTest {
         }
 
 
-        //remoteClient = createBlockingConnection(REMOTE_HOST, REMOTE_PORT, TOPICLOCALTOREMOTE);
+        remoteClient = createBlockingConnection(REMOTE_HOST, REMOTE_PORT, TOPICLOCALTOREMOTE);
     }
 
     @AfterClass
@@ -124,17 +124,22 @@ public class Remote extends BaseMQTTTest {
 
 
     @Test
-    public void basic() {
-
+    public void remoteToLocal() {
         getBoolFuture(emcuetitiConnected);
         getBoolFuture(emcuetitiSubbed);
 
-        /*String payload = "fromremote";
+        String payload = "fromremote";
         try {
             remoteClient.publish(TOPICREMOTETOLOCAL, payload.getBytes(), QoS.AT_MOST_ONCE, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }*/
+        }
+
+        try {
+            localClient.receive(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         try {
             Thread.sleep((60 * 1000) * 20);
@@ -142,6 +147,32 @@ public class Remote extends BaseMQTTTest {
 
         }
     }
+
+    /*
+    @Test
+    public void localToRemote() {
+        getBoolFuture(emcuetitiConnected);
+        getBoolFuture(emcuetitiSubbed);
+
+        String payload = "toremote";
+        try {
+            localClient.publish(TOPICLOCALTOREMOTE, payload.getBytes(), QoS.AT_MOST_ONCE, false);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            remoteClient.receive(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            Thread.sleep((60 * 1000) * 20);
+        } catch (InterruptedException ie) {
+
+        }
+    }*/
 
 
 }
