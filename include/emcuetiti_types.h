@@ -61,7 +61,7 @@ typedef struct {
 } emcuetiti_clientops;
 
 struct emcuetiti_clienthandle {
-	emcuetiti_clientops* ops;
+	const emcuetiti_clientops* ops;
 	void* userdata; // use this to stash whatever is needed to write/read the right client
 // in the write/read functions
 };
@@ -151,5 +151,6 @@ struct emcuetiti_brokerhandle {
 	emcuetiti_topichandle* root;
 	emcuetiti_porthandle* ports[EMCUETITI_CONFIG_MAXPORTS];
 	emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
-	emcuetiti_brokerhandle_callbacks* callbacks;
+	const emcuetiti_brokerhandle_callbacks* callbacks;
+	void* userdata;
 };

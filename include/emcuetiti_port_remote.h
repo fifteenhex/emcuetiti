@@ -55,7 +55,7 @@ typedef struct {
 #if EMCUETITI_CONFIG_HAVETLS
 	void* tlsconfig; // if using tls this should point to a tls config, else null
 #endif
-	emcuetiti_port_remote_hostops* hostops; //
+	const emcuetiti_port_remote_hostops* hostops; //
 } emcuetiti_port_remoteconfig;
 
 typedef struct {

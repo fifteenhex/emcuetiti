@@ -1,4 +1,18 @@
 include ../../common.mk
 
-$(OUTPUTDIR)/emcuetiti_linux: main_linux.c $(OUTPUTDIR)/libemcuetiti.a
+OUTPUTPREFIX=linux_glib_
+
+$(OUTPUTDIR)/emcuetiti_linux: main.c $(OUTPUTDIR)/$(OUTPUTPREFIX)commandline.o \
+$(OUTPUTDIR)/$(OUTPUTPREFIX)broker.o \
+$(OUTPUTDIR)/$(OUTPUTPREFIX)remote.o \
+$(OUTPUTDIR)/libemcuetiti.a
 	$(CC) $(CFLAGS) $(LFLAGS) -o $@ $^
+	
+$(OUTPUTDIR)/$(OUTPUTPREFIX)commandline.o: commandline.c commandline.h
+	$(CC) $(CFLAGS) $(LFLAGS) -c -o $@ $<
+
+$(OUTPUTDIR)/$(OUTPUTPREFIX)broker.o: broker.c broker.h
+	$(CC) $(CFLAGS) $(LFLAGS) -c -o $@ $<
+	
+$(OUTPUTDIR)/$(OUTPUTPREFIX)remote.o: remote.c remote.h
+	$(CC) $(CFLAGS) $(LFLAGS) -c -o $@ $<
