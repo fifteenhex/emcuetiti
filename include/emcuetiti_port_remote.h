@@ -96,6 +96,8 @@ typedef struct {
 	emcuetiti_port_remote_statedata statedata;
 	void* connectiondata;
 	uint16_t msgid;
+
+	BUFFERS_STATICBUFFER(topicbuffer, EMCUETITI_CONFIG_MAXTOPICPARTLEN);
 	BUFFERS_STATICBUFFER(publishbuffer, 1024);
 } emcuetiti_port_remote_portdata;
 

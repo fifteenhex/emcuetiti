@@ -499,6 +499,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &topicbyte,
 					1);
 			if (ret == 1) {
+				payloadwritefunc(payloadwriteuserdata, &topicbyte, 1);
 				if (pkt->counter == pkt->varhdr.publish.topiclen) {
 					bool publishhasmsgid = ((pkt->flags >> 1) & 0x3);
 					libmqtt_readpkt_changestate(pkt, changefunc,

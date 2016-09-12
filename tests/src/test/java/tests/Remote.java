@@ -135,11 +135,11 @@ public class Remote extends BaseMQTTTest {
             throw new RuntimeException(e);
         }
 
-        try {
+        /*try {
             localClient.receive(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
+        }*/
 
         try {
             Thread.sleep((60 * 1000) * 20);

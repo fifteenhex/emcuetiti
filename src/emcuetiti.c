@@ -8,6 +8,8 @@
 #include "emcuetiti_priv.h"
 #include "emcuetiti.h"
 
+#include "util.h"
+
 static void emcuetiti_broker_dumpstate_printtopic(emcuetiti_topichandle* node) {
 	bool first = node->parent == NULL;
 	if (!first) {
@@ -15,13 +17,6 @@ static void emcuetiti_broker_dumpstate_printtopic(emcuetiti_topichandle* node) {
 		printf("/");
 	}
 	printf("%s", node->topicpart);
-}
-
-static size_t min(size_t a, size_t b) {
-	if (a < b)
-		return a;
-	else
-		return b;
 }
 
 int emcuetiti_client_register(emcuetiti_brokerhandle* broker,
@@ -87,7 +82,7 @@ int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
 		}
 	}
 
-	len = min(len, cs->publishpayloadlen);
+	len = size_min(len, cs->publishpayloadlen);
 
 	memcpy(buffer, cs->buffer + cs->bufferpos, len);
 
@@ -158,27 +153,6 @@ EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
 	}
 }
 
-static emcuetiti_topichandle* emcuetiti_findtopic(
-		emcuetiti_brokerhandle* broker, emcuetiti_topichandle* root,
-		const char* topicpart) {
-
-	printf("looking for %s\n", topicpart);
-	if (root == NULL)
-		root = broker->root;
-	else
-		root = root->child;
-
-	for (; root != NULL; root = root->sibling) {
-		if (strcmp(root->topicpart, topicpart) == 0) {
-			printf("found %s\n", topicpart);
-			return root;
-		} else
-			printf("not %s\n", root->topicpart);
-	}
-
-	return NULL;
-}
-
 static libmqtt_writefunc emcuetiti_resolvewritefunc(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	libmqtt_writefunc writefunc = broker->callbacks->writefunc;
@@ -195,51 +169,6 @@ static void emcuetiti_handleinboundpacket_pingreq(
 	libmqtt_construct_pingresp(emcuetiti_resolvewritefunc(broker, cs),
 			cs->client->userdata);
 	cs->readstate = CLIENTREADSTATE_IDLE;
-}
-
-static emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
-		emcuetiti_brokerhandle* broker, uint8_t* buffer, uint16_t* topiclen,
-		emcuetiti_subscription_level* level) {
-
-	int topicpartpos = 0;
-	char topicpart[32];
-
-	uint16_t len = (*(buffer++) << 8) | *(buffer++);
-	emcuetiti_subscription_level sublevel = ONLYTHIS;
-
-	printf("part len is %d\n", len);
-
-	emcuetiti_topichandle* t = NULL;
-	for (uint16_t i = 0; i < len; i++) {
-		uint8_t byte = *(buffer++);
-		if (i + 1 == len) {
-			topicpart[topicpartpos++] = byte;
-			topicpart[topicpartpos] = '\0';
-
-			if (strcmp(topicpart, "#") == 0) {
-				printf("have multilevel wildcard\n");
-				sublevel = THISANDABOVE;
-			} else {
-				printf("%s\n", topicpart);
-				t = emcuetiti_findtopic(broker, t, topicpart);
-			}
-		} else if (byte == '/') {
-			topicpart[topicpartpos] = '\0';
-			topicpartpos = 0;
-			printf("%s\n", topicpart);
-			t = emcuetiti_findtopic(broker, t, topicpart);
-		} else
-			topicpart[topicpartpos++] = byte;
-
-	}
-
-	if (topiclen != NULL)
-		*topiclen = len;
-
-	if (level != NULL)
-		*level = sublevel;
-
-	return t;
 }
 
 static void emcuetiti_disconnectclient(emcuetiti_brokerhandle* broker,
@@ -535,32 +464,6 @@ void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 	}
 }
 
-static int emcuetiti_topic_topichandlewrite(libmqtt_writefunc writefunc,
-		void *writefuncuserdata, void* userdata) {
-
-	int len = 0;
-	emcuetiti_topichandle* node = (emcuetiti_topichandle*) userdata;
-
-	bool first = node->parent == NULL;
-	if (!first) {
-		len += emcuetiti_topic_topichandlewrite(writefunc, writefuncuserdata,
-				node->parent) + 1;
-		writefunc(writefuncuserdata, "/", 1);
-	}
-
-	writefunc(writefuncuserdata, node->topicpart, node->topicpartln);
-	return len;
-}
-
-static int emcuetiti_topic_len(emcuetiti_topichandle* node) {
-	int len = 0;
-	bool first = node->parent == NULL;
-	if (!first) {
-		len += (emcuetiti_topic_len(node->parent) + 1);
-	}
-	return len + node->topicpartln;
-}
-
 void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 		emcuetiti_publish* publish) {
 
@@ -610,7 +513,7 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 						broker->clients[c].client->userdata, //
 						publish->readfunc, //
 						publish->userdata, //
-						emcuetiti_topic_topichandlewrite, //
+						emcuetiti_topic_topichandlewriter, //
 						publish->topic, //
 						emcuetiti_topic_len(publish->topic), //
 						publish->payloadln, //
@@ -628,49 +531,6 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 
 //if (publish->freefunc != NULL)
 //	publish->freefunc(publish->userdata);
-}
-
-static emcuetiti_topichandle* emcuetiti_findparent(
-		emcuetiti_topichandle* sibling) {
-	for (; sibling->sibling != NULL; sibling = sibling->sibling) {
-
-	}
-#ifdef EMCUETITI_CONFIG_DEBUG
-	printf("attaching to %s\n", sibling->topicpart);
-#endif
-	return sibling;
-}
-
-void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
-		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
-		const char* topicpart, bool targetable) {
-
-// clear pointers
-	part->sibling = NULL;
-	part->child = NULL;
-	part->parent = NULL;
-
-	part->topicpart = topicpart;
-	part->topicpartln = strlen(topicpart);
-	part->targetable = targetable;
-
-	if (root == NULL) {
-		if (broker->root == NULL)
-			broker->root = part;
-		else {
-			emcuetiti_topichandle* parent = emcuetiti_findparent(broker->root);
-			parent->sibling = part;
-		}
-	} else {
-		// if this root doesn't have a child yet become that child
-		if (root->child == NULL)
-			root->child = part;
-		else {
-			emcuetiti_topichandle* parent = emcuetiti_findparent(root->child);
-			parent->sibling = part;
-		}
-		part->parent = root;
-	}
 }
 
 void emcuetiti_broker_init(emcuetiti_brokerhandle* broker) {

@@ -4,6 +4,9 @@
 
 #define EMCUETITI_CONFIG_DEBUG				true
 
+// config for the broker
+#define EMCUETITI_CONFIG_MAXTOPICPARTLEN	32
+
 // config for the host
 #define EMCUETITI_CONFIG_HAVETLS			true
 

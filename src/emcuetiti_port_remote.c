@@ -20,6 +20,32 @@ static void emcuetiti_port_remote_movetostate(
 	printf("s:%d\n", newstate);
 }
 
+static void processtopicpart(buffers_buffer* topicbuffer) {
+	uint8_t term = '\0';
+	buffers_buffer_append(topicbuffer, &term, 1);
+	printf("toppart: %s\n", topicbuffer->buffer);
+	buffers_buffer_reset(topicbuffer);
+}
+
+static int emcuetiti_port_remote_munchtopicpart(const uint8_t* buffer,
+		size_t len, buffers_buffer* topicbuffer) {
+
+	size_t consumed;
+	bool partcomplete = false;
+	for (consumed = 0; consumed < len; consumed++) {
+		if (buffer[consumed] == '/') {
+			partcomplete = true;
+			break;
+		}
+	}
+
+	buffers_buffer_append(topicbuffer, buffer, consumed);
+	if (partcomplete && buffers_buffer_available(topicbuffer) > 0)
+		processtopicpart(topicbuffer);
+
+	return consumed;
+}
+
 static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 		const uint8_t* buffer, size_t len) {
 
@@ -28,8 +54,18 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 			(emcuetiti_port_remote_portdata*) userdata;
 
 	if (portdata->statedata.ready.pktread.type == LIBMQTT_PACKETTYPE_PUBLISH) {
-		BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
-		ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
+		switch (portdata->statedata.ready.pktread.state) {
+		case LIBMQTT_PACKETREADSTATE_TOPIC: {
+			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuf);
+			ret = emcuetiti_port_remote_munchtopicpart(buffer, len, &topbuf);
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_PAYLOAD: {
+			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
+			ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
+		}
+			break;
+		}
 	} else {
 		printf("wr: %c[%02x]\n", buffer[0], buffer[0]);
 		ret = 1;
@@ -255,6 +291,8 @@ void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,
 	emcuetiti_port_remote_movetostate(portdata, REMOTEPORTSTATE_NOTCONNECTED);
 	port->portdata = portdata;
 
+	BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuff);
+	buffers_buffer_reset(&topbuff);
 	BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
 	buffers_buffer_reset(&pubbuff);
 
