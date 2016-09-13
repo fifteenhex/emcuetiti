@@ -4,7 +4,8 @@
 #include "commandline.h"
 
 // broker
-static int commandline_port;
+int commandline_port;
+gchar** commandline_topics;
 
 // remote
 char* commandline_remote_host = NULL;
@@ -15,6 +16,8 @@ int commandline_remote_keepalive = 0;
 static const GOptionEntry entries[] = { //
 		{ "port", 'p', 0, G_OPTION_ARG_INT, &commandline_port, "broker port",
 				"port" }, //
+				{ "topic", 't', 0, G_OPTION_ARG_STRING_ARRAY,
+						&commandline_topics, "topic", "topic" }, //
 				NULL };
 
 static const GOptionEntry remote_entries[] = { //

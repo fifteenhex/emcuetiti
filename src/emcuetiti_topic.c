@@ -4,9 +4,8 @@
 #include "emcuetiti_config.h"
 #include "emcuetiti_topic.h"
 
-static emcuetiti_topichandle* emcuetiti_findtopic(
-		emcuetiti_brokerhandle* broker, emcuetiti_topichandle* root,
-		const char* topicpart) {
+emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
+		emcuetiti_topichandle* root, const char* topicpart) {
 
 	printf("looking for %s\n", topicpart);
 	if (root == NULL)
@@ -34,15 +33,15 @@ int emcuetiti_topic_len(emcuetiti_topichandle* node) {
 	return len + node->topicpartln;
 }
 
-static emcuetiti_topichandle* emcuetiti_findparent(
+static void emcuetiti_attach(emcuetiti_topichandle* level,
 		emcuetiti_topichandle* sibling) {
-	for (; sibling->sibling != NULL; sibling = sibling->sibling) {
+	for (; level->sibling != NULL; level = level->sibling) {
 
 	}
 #ifdef EMCUETITI_CONFIG_DEBUG
-	printf("attaching to %s\n", sibling->topicpart);
+	printf("attaching to %s\n", level->topicpart);
 #endif
-	return sibling;
+	level->sibling = sibling;
 }
 
 int emcuetiti_topic_topichandlewriter(libmqtt_writefunc writefunc,
@@ -75,20 +74,23 @@ void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 	part->topicpartln = strlen(topicpart);
 	part->targetable = targetable;
 
+	emcuetiti_topichandle* attachmentlevel;
+
+	// attaching at the root level
 	if (root == NULL) {
+		// root for the broker hasn't been set yet, use this topic
 		if (broker->root == NULL)
 			broker->root = part;
-		else {
-			emcuetiti_topichandle* parent = emcuetiti_findparent(broker->root);
-			parent->sibling = part;
-		}
+		// otherwise attach to the bottom of the broker's root
+		else
+			emcuetiti_attach(broker->root, part);
 	} else {
 		// if this root doesn't have a child yet become that child
 		if (root->child == NULL)
 			root->child = part;
+		// otherwise attach to the bottom of the child
 		else {
-			emcuetiti_topichandle* parent = emcuetiti_findparent(root->child);
-			parent->sibling = part;
+			emcuetiti_attach(root->child, part);
 		}
 		part->parent = root;
 	}

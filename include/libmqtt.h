@@ -120,7 +120,7 @@ typedef int (*libmqtt_readfunc)(void* userdata, uint8_t* buffer, size_t len);
 typedef int (*libmqtt_topicwriter)(libmqtt_writefunc writefunc,
 		void* writefuncuserdata, void* userdata);
 
-typedef int (*libmqtt_packetreadchange)(libmqtt_packetread* pkt);
+typedef int (*libmqtt_packetreadchange)(libmqtt_packetread* pkt, void* userdata);
 
 // User API
 
@@ -167,7 +167,7 @@ int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 
 int libmqtt_decodelength(uint8_t* buffer, size_t* len);
 
-int libmqtt_readpkt(libmqtt_packetread* pkt,
-		libmqtt_packetreadchange changefunc, // pkt and change callback
+int libmqtt_readpkt(libmqtt_packetread* pkt, // pkt being read
+		libmqtt_packetreadchange changefunc, void* changeuserdata, // pkt state change callback
 		libmqtt_readfunc readfunc, void* readuserdata, // func and data for reading the packet in
 		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata); // func and data for writing the payload out

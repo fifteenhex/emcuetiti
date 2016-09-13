@@ -91,14 +91,17 @@ typedef union {
 } emcuetiti_port_remote_statedata;
 
 typedef struct {
+	const emcuetiti_brokerhandle* broker;
 	const emcuetiti_port_remoteconfig* config;
 	emcuetiti_port_remote_state state;
 	emcuetiti_port_remote_statedata statedata;
 	void* connectiondata;
 	uint16_t msgid;
 
+// incoming publish tracking
 	BUFFERS_STATICBUFFER(topicbuffer, EMCUETITI_CONFIG_MAXTOPICPARTLEN);
-	BUFFERS_STATICBUFFER(publishbuffer, 1024);
+	emcuetiti_topichandle* topic;
+	BUFFERS_STATICBUFFER(publishbuffer, EMCUETITI_CONFIG_MAXPAYLOADLEN);
 } emcuetiti_port_remote_portdata;
 
 void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,

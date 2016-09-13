@@ -10,3 +10,6 @@ emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 		emcuetiti_subscription_level* level);
 
 int emcuetiti_topic_len(emcuetiti_topichandle* node);
+
+emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
+		emcuetiti_topichandle* root, const char* topicpart);

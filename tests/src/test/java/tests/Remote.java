@@ -27,8 +27,8 @@ import java.util.concurrent.TimeoutException;
 
 public class Remote extends BaseMQTTTest {
 
-    private static final String TOPICLOCALTOREMOTE = "/remote/localtoremote";
-    private static final String TOPICREMOTETOLOCAL = "/remote/remotetolocal";
+    private static final String TOPICLOCALTOREMOTE = "remote/localtoremote";
+    private static final String TOPICREMOTETOLOCAL = "remote/remotetolocal";
     private static final int REMOTE_PORT = 8992;
     private static final String REMOTE_HOST = "127.0.0.1";
     private static final Server remoteBroker = new Server();

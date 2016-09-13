@@ -41,9 +41,9 @@ typedef emcuetiti_timestamp (*emcuetiti_timstampfunc)(void);
 struct emcuetiti_topichandle {
 	const char* topicpart;
 	size_t topicpartln;
-	struct emucutiti_topichandle* child;
-	struct emcuetiti_topichandle* sibling;
-	struct emcuetiti_topichandle* parent;
+	emcuetiti_topichandle* child;
+	emcuetiti_topichandle* sibling;
+	emcuetiti_topichandle* parent;
 	bool targetable;
 };
 

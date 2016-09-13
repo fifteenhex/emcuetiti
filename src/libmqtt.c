@@ -375,7 +375,8 @@ int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 }
 
 int libmqtt_readpkt_changestate(libmqtt_packetread* pkt,
-		libmqtt_packetreadchange changefunc, libmqtt_packetread_state newstate) {
+		libmqtt_packetreadchange changefunc, libmqtt_packetread_state newstate,
+		void* userdata) {
 	int ret = 0;
 
 	pkt->counter = 0;
@@ -388,7 +389,7 @@ int libmqtt_readpkt_changestate(libmqtt_packetread* pkt,
 			pkt->state = LIBMQTT_PACKETREADSTATE_FINISHED;
 
 	if (changefunc != NULL)
-		ret = changefunc(pkt);
+		ret = changefunc(pkt, userdata);
 
 	return ret;
 }
@@ -406,10 +407,10 @@ int libmqtt_readpkt_read(libmqtt_packetread* pkt, libmqtt_readfunc readfunc,
 	return ret;
 }
 
-int libmqtt_readpkt(libmqtt_packetread* pkt,
-		libmqtt_packetreadchange changefunc, libmqtt_readfunc readfunc,
-		void* readuserdata, libmqtt_writefunc payloadwritefunc,
-		void* payloadwriteuserdata) {
+int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
 
 	int ret = 0;
 
@@ -437,10 +438,10 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 					pkt->length = 1;
 					pkt->lenmultiplier = 1;
 					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_LEN);
+							LIBMQTT_PACKETREADSTATE_LEN, changeuserdata);
 				} else
 					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_ERROR);
+							LIBMQTT_PACKETREADSTATE_ERROR, changeuserdata);
 			}
 		}
 			break;
@@ -465,18 +466,21 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 					// connacks has a flags byte and a return code byte
 					if (pkt->type == LIBMQTT_PACKETTYPE_CONNACK)
 						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_CONNFLAGS);
+								LIBMQTT_PACKETREADSTATE_CONNFLAGS,
+								changeuserdata);
 					// publishes always have a topic
 					else if (pkt->type == LIBMQTT_PACKETTYPE_PUBLISH)
 						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_TOPICLEN);
+								LIBMQTT_PACKETREADSTATE_TOPICLEN,
+								changeuserdata);
 					// some packets have a message id
 					else if (hasmessageid)
 						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_MSGID);
+								LIBMQTT_PACKETREADSTATE_MSGID, changeuserdata);
 					else
 						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_PAYLOAD);
+								LIBMQTT_PACKETREADSTATE_PAYLOAD,
+								changeuserdata);
 				}
 			}
 		}
@@ -490,7 +494,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 						<< 8) | topiclenbyte;
 				if (pkt->counter == 2)
 					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_TOPIC);
+							LIBMQTT_PACKETREADSTATE_TOPIC, changeuserdata);
 			};
 		}
 			break;
@@ -505,7 +509,8 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 					libmqtt_readpkt_changestate(pkt, changefunc,
 							publishhasmsgid ?
 									LIBMQTT_PACKETREADSTATE_MSGID :
-									LIBMQTT_PACKETREADSTATE_PAYLOAD);
+									LIBMQTT_PACKETREADSTATE_PAYLOAD,
+							changeuserdata);
 				}
 			};
 		}
@@ -518,7 +523,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 				pkt->varhdr.msgid = (pkt->varhdr.msgid << 8) | msgidbyte;
 				if (pkt->counter == 2)
 					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_PAYLOAD);
+							LIBMQTT_PACKETREADSTATE_PAYLOAD, changeuserdata);
 			};
 
 		}
@@ -529,7 +534,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 			if (ret == 1) {
 				pkt->varhdr.connack.ackflags = flags;
 				libmqtt_readpkt_changestate(pkt, changefunc,
-						LIBMQTT_PACKETREADSTATE_CONNRET);
+						LIBMQTT_PACKETREADSTATE_CONNRET, changeuserdata);
 			}
 		}
 			break;
@@ -540,7 +545,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 			if (ret == 1) {
 				pkt->varhdr.connack.returncode = returncode;
 				libmqtt_readpkt_changestate(pkt, changefunc,
-						LIBMQTT_PACKETREADSTATE_FINISHED);
+						LIBMQTT_PACKETREADSTATE_FINISHED, changeuserdata);
 			}
 		}
 			break;
@@ -560,7 +565,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 				libmqtt_readpkt_incposandcounter(pkt, ret);
 
 			libmqtt_readpkt_changestate(pkt, changefunc,
-					LIBMQTT_PACKETREADSTATE_PAYLOAD);
+					LIBMQTT_PACKETREADSTATE_PAYLOAD, changeuserdata);
 		}
 			break;
 		}
@@ -569,7 +574,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt,
 
 	if (ret <= LIBMQTT_EFATAL)
 		libmqtt_readpkt_changestate(pkt, changefunc,
-				LIBMQTT_PACKETREADSTATE_ERROR);
+				LIBMQTT_PACKETREADSTATE_ERROR, changeuserdata);
 
 	return ret;
 }

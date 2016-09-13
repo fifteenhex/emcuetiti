@@ -3,6 +3,8 @@
 #include <stdbool.h>
 
 #include "broker.h"
+#include "commandline.h"
+#include "emcuetiti_topic.h"
 #include "emcuetiti_port_router.h"
 #include "emcuetiti_port_remote.h"
 
@@ -112,18 +114,23 @@ static void broker_init_setup(emcuetiti_brokerhandle* broker) {
 
 	emcuetiti_broker_init(broker);
 
-	emcuetiti_broker_addtopicpart(broker, NULL, &data.topic1, "topic1", true);
-	emcuetiti_broker_addtopicpart(broker, &data.topic1, &data.subtopic1,
-			"subtopic1",
-			true);
-
-	emcuetiti_broker_addtopicpart(broker, NULL, &data.topic2, "topic2", true);
-	emcuetiti_broker_addtopicpart(broker, &data.topic2, &data.topic2subtopic1,
-			"topic1subtopic2", true);
-	emcuetiti_broker_addtopicpart(broker, &data.topic2, &data.topic2subtopic2,
-			"topic2subtopic2", true);
-	emcuetiti_broker_addtopicpart(broker, &data.topic2subtopic2,
-			&data.topic2subtopic2subtopic1, "subtopic2subtopic1", true);
+	for (gchar** topic = commandline_topics; *topic != NULL; topic++) {
+		gchar** topicparts = g_strsplit(*topic, "/", -1);
+		emcuetiti_topichandle* l = NULL;
+		for (gchar** topicpart = topicparts; *topicpart != NULL; topicpart++) {
+			bool last = *(topicpart + 1) == NULL;
+			emcuetiti_topichandle* t = emcuetiti_findtopic(broker, l,
+					*topicpart);
+			if (t == NULL) {
+				t = g_malloc(sizeof(emcuetiti_topichandle));
+				gchar* topicpartcopy = g_strdup(*topicpart);
+				emcuetiti_broker_addtopicpart(broker, l, t, topicpartcopy,
+						last);
+			}
+			l = t;
+		}
+		g_strfreev(topicparts);
+	}
 
 	emcuetiti_port_router(broker, &data.routerport);
 

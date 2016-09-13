@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+
 #include "emcuetiti_port_remote.h"
 #include "emcuetiti.h"
 
@@ -20,14 +21,20 @@ static void emcuetiti_port_remote_movetostate(
 	printf("s:%d\n", newstate);
 }
 
-static void processtopicpart(buffers_buffer* topicbuffer) {
+static void processtopicpart(emcuetiti_port_remote_portdata* data,
+		buffers_buffer* topicbuffer) {
 	uint8_t term = '\0';
 	buffers_buffer_append(topicbuffer, &term, 1);
 	printf("toppart: %s\n", topicbuffer->buffer);
+
+	data->topic = emcuetiti_findtopic(data->broker, data->topic,
+			topicbuffer->buffer);
+
 	buffers_buffer_reset(topicbuffer);
 }
 
-static int emcuetiti_port_remote_munchtopicpart(const uint8_t* buffer,
+static int emcuetiti_port_remote_munchtopicpart(
+		emcuetiti_port_remote_portdata* portdata, const uint8_t* buffer,
 		size_t len, buffers_buffer* topicbuffer) {
 
 	size_t consumed;
@@ -41,7 +48,7 @@ static int emcuetiti_port_remote_munchtopicpart(const uint8_t* buffer,
 
 	buffers_buffer_append(topicbuffer, buffer, consumed);
 	if (partcomplete && buffers_buffer_available(topicbuffer) > 0)
-		processtopicpart(topicbuffer);
+		processtopicpart(portdata, topicbuffer);
 
 	return consumed;
 }
@@ -57,7 +64,8 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 		switch (portdata->statedata.ready.pktread.state) {
 		case LIBMQTT_PACKETREADSTATE_TOPIC: {
 			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuf);
-			ret = emcuetiti_port_remote_munchtopicpart(buffer, len, &topbuf);
+			ret = emcuetiti_port_remote_munchtopicpart(portdata, buffer, len,
+					&topbuf);
 		}
 			break;
 		case LIBMQTT_PACKETREADSTATE_PAYLOAD: {
@@ -73,15 +81,31 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 	return ret;
 }
 
-static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt) {
+static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
+		void* userdata) {
+
+	emcuetiti_port_remote_portdata* portdata =
+			(emcuetiti_port_remote_portdata*) userdata;
+
 	printf("ps:%d\n", (int) pkt->state);
 
+	BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuff);
+
 	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_TYPE: {
+		// reset everything
+		buffers_buffer_reset(&topbuff);
+		portdata->topic = NULL;
+		BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
+		buffers_buffer_reset(&pubbuff);
+	}
+		break;
 	case LIBMQTT_PACKETREADSTATE_TOPIC:
 		printf("tl:%u\n", pkt->varhdr.publish.topiclen);
 		break;
 	case LIBMQTT_PACKETREADSTATE_PAYLOAD:
 		printf("pl:%u\n", pkt->length - pkt->pos);
+		processtopicpart(portdata, &topbuff);
 		break;
 	}
 
@@ -90,7 +114,7 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt)
 
 static bool emcuetiti_port_remote_readpacket(
 		emcuetiti_port_remote_portdata* portdata, libmqtt_packetread* pkt) {
-	libmqtt_readpkt(pkt, emcuetiti_port_remote_readpacket_statechange,
+	libmqtt_readpkt(pkt, emcuetiti_port_remote_readpacket_statechange, portdata,
 			portdata->config->hostops->read, portdata->connectiondata,
 			emcuetiti_port_remote_readpacket_writer, portdata);
 
@@ -286,15 +310,11 @@ void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,
 	port->pollfunc = emcuetiti_port_remote_poll;
 	port->publishreadycallback = emcuetiti_port_remote_publishready;
 
+	portdata->broker = broker;
 	portdata->config = config;
 	portdata->msgid = 0;
 	emcuetiti_port_remote_movetostate(portdata, REMOTEPORTSTATE_NOTCONNECTED);
 	port->portdata = portdata;
-
-	BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuff);
-	buffers_buffer_reset(&topbuff);
-	BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
-	buffers_buffer_reset(&pubbuff);
 
 	emcuetiti_port_register(broker, port);
 }

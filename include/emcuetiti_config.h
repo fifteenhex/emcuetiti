@@ -6,6 +6,7 @@
 
 // config for the broker
 #define EMCUETITI_CONFIG_MAXTOPICPARTLEN	32
+#define EMCUETITI_CONFIG_MAXPAYLOADLEN		1024
 
 // config for the host
 #define EMCUETITI_CONFIG_HAVETLS			true
