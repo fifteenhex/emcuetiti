@@ -33,7 +33,7 @@ public class ClientBasic extends BaseMQTTTest {
         BlockingConnection publisher = mqttConnections[1];
         subscribeToTopic(listener, TOPIC + "/#");
         try {
-            exchange(listener, publisher, TOPIC + "/" + SUBTOPIC, "hello", false);
+            exchange(listener, publisher, FULLSUBTOPIC, "hello", false);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {

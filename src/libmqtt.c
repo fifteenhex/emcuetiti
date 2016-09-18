@@ -419,8 +419,8 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 		memset(pkt, 0, sizeof(*pkt));
 
 	while (pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED && ret >= 0) {
-		//printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
-		//		pkt->pos);
+		printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
+				pkt->pos);
 		switch (pkt->state) {
 		case LIBMQTT_PACKETREADSTATE_TYPE: {
 			uint8_t typeandflags;
@@ -463,8 +463,12 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 							|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBSCRIBE)
 							|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBACK);
 
+					if (pkt->type == LIBMQTT_PACKETTYPE_CONNECT)
+						libmqtt_readpkt_changestate(pkt, changefunc,
+								LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN,
+								changeuserdata);
 					// connacks has a flags byte and a return code byte
-					if (pkt->type == LIBMQTT_PACKETTYPE_CONNACK)
+					else if (pkt->type == LIBMQTT_PACKETTYPE_CONNACK)
 						libmqtt_readpkt_changestate(pkt, changefunc,
 								LIBMQTT_PACKETREADSTATE_CONNFLAGS,
 								changeuserdata);
@@ -485,6 +489,77 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 			}
 		}
 			break;
+
+			// connect var header
+
+		case LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN: {
+			uint8_t topiclenbyte;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata,
+					&topiclenbyte, 1);
+			if (ret == 1) {
+				pkt->varhdr.publish.topiclen = (pkt->varhdr.publish.topiclen
+						<< 8) | topiclenbyte;
+				if (pkt->counter == 2)
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_CONNECT_PROTO,
+							changeuserdata);
+			};
+		}
+			break;
+		case LIBMQTT_PACKETREADSTATE_CONNECT_PROTO: {
+			uint8_t topicbyte;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &topicbyte,
+					1);
+			if (ret == 1) {
+				//payloadwritefunc(payloadwriteuserdata, &topicbyte, 1);
+				if (pkt->counter == pkt->varhdr.publish.topiclen) {
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL,
+							changeuserdata);
+				}
+			};
+		}
+			break;
+
+		case LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL: {
+			uint8_t level;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &level, 1);
+			if (ret == 1) {
+				pkt->varhdr.connect.level = level;
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS, changeuserdata);
+			}
+		}
+			break;
+
+		case LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS: {
+			uint8_t flags;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &flags, 1);
+			if (ret == 1) {
+				pkt->varhdr.connect.flags = flags;
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE,
+						changeuserdata);
+			}
+		}
+			break;
+
+		case LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE: {
+			uint8_t keepalivebyte;
+			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata,
+					&keepalivebyte, 1);
+			if (ret == 1) {
+				pkt->varhdr.connect.keepalive = pkt->varhdr.connect.keepalive
+						<< 8 | keepalivebyte;
+				if (pkt->counter == 2) {
+					libmqtt_readpkt_changestate(pkt, changefunc,
+							LIBMQTT_PACKETREADSTATE_PAYLOAD, changeuserdata);
+				}
+			}
+		}
+			break;
+			//
+
 		case LIBMQTT_PACKETREADSTATE_TOPICLEN: {
 			uint8_t topiclenbyte;
 			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata,
@@ -503,7 +578,8 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &topicbyte,
 					1);
 			if (ret == 1) {
-				payloadwritefunc(payloadwriteuserdata, &topicbyte, 1);
+				if (payloadwritefunc != NULL)
+					payloadwritefunc(payloadwriteuserdata, &topicbyte, 1);
 				if (pkt->counter == pkt->varhdr.publish.topiclen) {
 					bool publishhasmsgid = ((pkt->flags >> 1) & 0x3);
 					libmqtt_readpkt_changestate(pkt, changefunc,
@@ -553,10 +629,13 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 			// try to read
 			size_t remaining = pkt->length - pkt->pos;
 			BUFFERS_STATICBUFFER_TO_BUFFER(pkt->buffer, pktbuffer);
-			ret = buffers_buffer_fill(&pktbuffer, remaining, readfunc,
-					readuserdata);
-			if (ret < 0)
-				break;
+
+			if (remaining > 0) {
+				ret = buffers_buffer_fill(&pktbuffer, remaining, readfunc,
+						readuserdata);
+				if (ret < 0)
+					break;
+			}
 
 			// try to flush
 			ret = buffers_buffer_flush(&pktbuffer, payloadwritefunc,

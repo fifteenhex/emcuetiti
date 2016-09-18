@@ -67,8 +67,10 @@ int buffers_buffer_flush(buffers_buffer* buffer, libmqtt_writefunc writefunc,
 					writesz);
 			if (ret > 0)
 				buffers_buffer_consume(buffer, ret);
-		} else
+		} else {
 			buffers_buffer_consume(buffer, writesz);
+			ret = writesz;
+		}
 
 		if (buffers_buffer_available(buffer) == 0)
 			buffers_buffer_reset(buffer);

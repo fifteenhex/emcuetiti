@@ -37,6 +37,9 @@ typedef void (*emcuetiti_disconnectfunc)(emcuetiti_brokerhandle* broker,
 
 typedef emcuetiti_timestamp (*emcuetiti_timstampfunc)(void);
 
+typedef void (*emcuetiti_logfunc)(emcuetiti_brokerhandle* broker,
+		const char* msg, ...);
+
 // shared structures
 struct emcuetiti_topichandle {
 	const char* topicpart;
@@ -48,20 +51,31 @@ struct emcuetiti_topichandle {
 };
 
 // client structures
+
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS
 typedef struct {
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_ISCONNECTED
 	emcuetiti_isconnected isconnectedfunc;
+#endif
 #if EMCUETITI_CONFIG_CLIENTCALLBACKS_WRITE
 	libmqtt_writefunc writefunc; // function pointer to the function used to write data to the client
 #endif
+#if EMCUETITI_CONFIG_PERCLIENTCALLBACKS_READYTOREAD
 	emcuetiti_readytoreadfunc readytoread;
+#endif
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_READ
 	emcuetiti_readfunc readfunc; // function pointer to the function user to read data from the client
-#if EMCUETITIT_CONFIG_CLIENTCALLBACKS_DISCONNECT
+#endif
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_DISCONNECT
 	emcuetiti_disconnectfunc disconnectfunc; //
 #endif
-} emcuetiti_clientops;
+}emcuetiti_clientops;
+#endif
 
 struct emcuetiti_clienthandle {
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS
 	const emcuetiti_clientops* ops;
+#endif
 	void* userdata; // use this to stash whatever is needed to write/read the right client
 // in the write/read functions
 };
@@ -69,15 +83,6 @@ struct emcuetiti_clienthandle {
 typedef enum {
 	CLIENTSTATE_NEW, CLIENTSTATE_CONNECTED, CLIENTSTATE_DISCONNECTED
 } emcuetiti_clientconnectionstate;
-
-typedef enum {
-	CLIENTREADSTATE_IDLE,
-	CLIENTREADSTATE_TYPE,
-	CLIENTREADSTATE_REMAININGLEN,
-	CLIENTREADSTATE_PAYLOAD,
-	CLIENTREADSTATE_COMPLETE,
-	CLIENTREADSTATE_PUBLISHREADY
-} emcuetiti_clientreadstate;
 
 typedef enum {
 	ONLYTHIS, THISANDABOVE
@@ -103,7 +108,10 @@ struct emcuetiti_clientstate {
 	unsigned bufferpos;
 
 	emcuetiti_clientconnectionstate state;
-	emcuetiti_clientreadstate readstate;
+//emcuetiti_clientreadstate readstate;
+
+	libmqtt_packetread incomingpacket;
+
 	uint8_t packettype;
 	size_t varheaderandpayloadlen;
 	size_t remainingbytes;
@@ -138,11 +146,18 @@ typedef struct {
 } emcuetiti_bufferholder;
 
 typedef struct {
+
 	emcuetiti_authenticateclientfunc authenticatecallback;
 	emcuetiti_timstampfunc timestamp;
 
-	// client funcs
+// optional
+	emcuetiti_logfunc log;
+
+// client funcs
+	emcuetiti_isconnected isconnectedfunc;
 	libmqtt_writefunc writefunc;
+	emcuetiti_readytoreadfunc readytoread;
+	libmqtt_readfunc readfunc;
 	emcuetiti_disconnectfunc disconnectfunc;
 } emcuetiti_brokerhandle_callbacks;
 

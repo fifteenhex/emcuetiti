@@ -75,6 +75,13 @@ typedef enum {
 	LIBMQTT_PACKETREADSTATE_TOPICLEN,// packet topic length, only valid for publish
 	LIBMQTT_PACKETREADSTATE_TOPIC,		// packet topic, only valid for publish
 	LIBMQTT_PACKETREADSTATE_MSGID,// packet message id, only valid for packets that need it
+
+	LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN,	//
+	LIBMQTT_PACKETREADSTATE_CONNECT_PROTO,		//
+	LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL, //
+	LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS,		//
+	LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE,	//
+
 	LIBMQTT_PACKETREADSTATE_CONNFLAGS,// connection flags, only valid for connack
 	LIBMQTT_PACKETREADSTATE_CONNRET,// connection return code, only valid for connack
 
@@ -82,6 +89,12 @@ typedef enum {
 	LIBMQTT_PACKETREADSTATE_FINISHED,	// packet has been read completely
 	LIBMQTT_PACKETREADSTATE_ERROR
 } libmqtt_packetread_state;
+
+typedef struct {
+	uint8_t level;
+	uint8_t flags;
+	uint16_t keepalive;
+} libmqtt_packet_connect;
 
 typedef struct {
 	uint8_t ackflags;
@@ -95,6 +108,7 @@ typedef struct {
 
 typedef union {
 	uint16_t msgid;
+	libmqtt_packet_connect connect;
 	libmqtt_packet_connack connack;
 	libmqtt_packet_publish publish;
 } libmqtt_packetread_varhdr;

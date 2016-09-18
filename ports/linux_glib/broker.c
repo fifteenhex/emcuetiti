@@ -1,18 +1,18 @@
 #include <gio/gio.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 #include "broker.h"
 #include "commandline.h"
 #include "emcuetiti_topic.h"
 #include "emcuetiti_port_router.h"
 #include "emcuetiti_port_remote.h"
+#include "gsocketfuncs.h"
 
 typedef struct {
 	GSocket* serversocket;
 	emcuetiti_porthandle routerport;
-	emcuetiti_topichandle topic1, subtopic1, topic2, topic2subtopic1,
-			topic2subtopic2, topic2subtopic2subtopic1;
 } brokerdata;
 
 static brokerdata data;
@@ -20,15 +20,6 @@ static brokerdata data;
 static bool readytoread(void* userdata) {
 	GSocket* socket = (GSocket*) userdata;
 	return g_socket_condition_check(socket, G_IO_IN) == G_IO_IN;
-}
-
-static int gsocket_read(void* userdata, uint8_t* buffer, size_t len) {
-	GSocket* socket = (GSocket*) userdata;
-	int ret = g_socket_receive(socket, buffer, len, NULL, NULL);
-	if (ret != len)
-		printf("wanted %d, read %d\n", len, ret);
-	return ret;
-
 }
 
 static int gsocket_write(void* userdata, const uint8_t* buffer, size_t len) {
@@ -50,21 +41,26 @@ static void gsocket_disconnect(emcuetiti_brokerhandle* broker,
 	g_free(client);
 }
 
-static const emcuetiti_clientops gsocketclientops = { //
-		.isconnectedfunc = gsocket_isconnected, //
-				.readytoread = readytoread, //
-				.readfunc = gsocket_read };
-
 static uint32_t broker_timestamp() {
 	uint32_t now = (uint32_t) (g_get_monotonic_time() / 1000000);
 	return now;
 }
 
+static void broker_log(emcuetiti_brokerhandle* broker, const char* msg, ...) {
+	va_list formatargs;
+	va_start(formatargs, msg);
+	g_logv(NULL, G_LOG_LEVEL_MESSAGE, msg, formatargs);
+	va_end(formatargs);
+}
+
 static const emcuetiti_brokerhandle_callbacks brokerops = { //
 		.authenticatecallback = NULL, //
 				.timestamp = broker_timestamp, //
-				.writefunc = gsocket_write, //
-				.disconnectfunc = gsocket_disconnect };
+				.log = broker_log, .writefunc = gsocket_write, //
+				.disconnectfunc = gsocket_disconnect, //
+				.isconnectedfunc = gsocket_isconnected, //
+				.readytoread = readytoread, //
+				.readfunc = gsocket_read };
 
 static gboolean brokerpoll(gpointer data) {
 	emcuetiti_brokerhandle* broker = (emcuetiti_brokerhandle*) data;
@@ -81,16 +77,15 @@ static gboolean serversocket_callback(GSocket *socket, GIOCondition condition,
 	GSocket* clientsocket = g_socket_accept(bdata->serversocket, NULL,
 	NULL);
 	if (clientsocket != NULL) {
-
 		if (emcuetiti_broker_canacceptmoreclients(broker)) {
 			g_message("incoming connection");
 			emcuetiti_clienthandle* client = g_malloc(
 					sizeof(emcuetiti_clienthandle));
 
 			client->userdata = clientsocket;
-			client->ops = &gsocketclientops;
 			emcuetiti_client_register(broker, client);
 
+			g_socket_set_blocking(clientsocket, false);
 			/*
 			 GSource* clientsocketsource = g_socket_create_source(clientsocket,
 			 G_IO_IN, NULL);
@@ -114,22 +109,25 @@ static void broker_init_setup(emcuetiti_brokerhandle* broker) {
 
 	emcuetiti_broker_init(broker);
 
-	for (gchar** topic = commandline_topics; *topic != NULL; topic++) {
-		gchar** topicparts = g_strsplit(*topic, "/", -1);
-		emcuetiti_topichandle* l = NULL;
-		for (gchar** topicpart = topicparts; *topicpart != NULL; topicpart++) {
-			bool last = *(topicpart + 1) == NULL;
-			emcuetiti_topichandle* t = emcuetiti_findtopic(broker, l,
-					*topicpart);
-			if (t == NULL) {
-				t = g_malloc(sizeof(emcuetiti_topichandle));
-				gchar* topicpartcopy = g_strdup(*topicpart);
-				emcuetiti_broker_addtopicpart(broker, l, t, topicpartcopy,
-						last);
+	if (commandline_topics != NULL) {
+		for (gchar** topic = commandline_topics; *topic != NULL; topic++) {
+			gchar** topicparts = g_strsplit(*topic, "/", -1);
+			emcuetiti_topichandle* l = NULL;
+			for (gchar** topicpart = topicparts; *topicpart != NULL;
+					topicpart++) {
+				bool last = *(topicpart + 1) == NULL;
+				emcuetiti_topichandle* t = emcuetiti_findtopic(broker, l,
+						*topicpart);
+				if (t == NULL) {
+					t = g_malloc(sizeof(emcuetiti_topichandle));
+					gchar* topicpartcopy = g_strdup(*topicpart);
+					emcuetiti_broker_addtopicpart(broker, l, t, topicpartcopy,
+							last);
+				}
+				l = t;
 			}
-			l = t;
+			g_strfreev(topicparts);
 		}
-		g_strfreev(topicparts);
 	}
 
 	emcuetiti_port_router(broker, &data.routerport);
@@ -171,5 +169,5 @@ int broker_init(GMainLoop* mainloop, emcuetiti_brokerhandle* broker) {
 }
 
 void broker_cleanup(emcuetiti_brokerhandle* broker) {
-	//g_socket_close(serversocket, NULL);
+//g_socket_close(serversocket, NULL);
 }

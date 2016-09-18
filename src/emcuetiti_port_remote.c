@@ -107,6 +107,10 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
 		printf("pl:%u\n", pkt->length - pkt->pos);
 		processtopicpart(portdata, &topbuff);
 		break;
+	case LIBMQTT_PACKETREADSTATE_FINISHED:
+		if (pkt->type == LIBMQTT_PACKETTYPE_PUBLISH)
+			portdata->publishwaiting = true;
+		break;
 	}
 
 	return LIBMQTT_EWOULDBLOCK;
@@ -246,6 +250,25 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 					data->config->keepalive * 2, data);
 		break;
 	case REMOTEPORTSTATE_READY_WRITE:
+
+		if (data->publishwaiting) {
+
+			BUFFERS_STATICBUFFER_TO_BUFFER(data->publishbuffer, pb);
+
+			emcuetiti_publish pub = { .topic = data->topic,
+			/*emcuetiti_writefunc writefunc;*/
+			.readfunc = buffers_buffer_readfunc,
+			/*
+			 emcuetiti_freefunc freefunc;
+			 emcuetiti_resetfunc resetfunc;*/
+			.userdata = &pb, //
+					.payloadln = buffers_buffer_available(&pb) };
+
+			emcuetiti_broker_publish(data->broker, &pub);
+
+			data->publishwaiting = false;
+		}
+
 		break;
 	case REMOTEPORTSTATE_READY_KEEPALIVE:
 		if (data->config->keepalive > 0) {

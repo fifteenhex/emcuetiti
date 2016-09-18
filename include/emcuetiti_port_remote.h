@@ -102,6 +102,7 @@ typedef struct {
 	BUFFERS_STATICBUFFER(topicbuffer, EMCUETITI_CONFIG_MAXTOPICPARTLEN);
 	emcuetiti_topichandle* topic;
 	BUFFERS_STATICBUFFER(publishbuffer, EMCUETITI_CONFIG_MAXPAYLOADLEN);
+	bool publishwaiting;
 } emcuetiti_port_remote_portdata;
 
 void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,

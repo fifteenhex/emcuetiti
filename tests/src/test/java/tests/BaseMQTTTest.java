@@ -24,6 +24,7 @@ public class BaseMQTTTest {
     protected static final String TOPIC = "topic1";
     protected static final String SUBTOPIC = "subtopic1";
     protected static final String TOPIC2 = "topic2";
+    protected static final String FULLSUBTOPIC = TOPIC + "/" + SUBTOPIC;
 
     private static Process brokerProcess;
     protected static BlockingConnection[] mqttConnections = new BlockingConnection[MQTT_CLIENTS];
@@ -42,6 +43,7 @@ public class BaseMQTTTest {
             mqttClient.setHost(host, port);
             mqttClient.setConnectAttemptsMax(1);
             mqttClient.setReconnectAttemptsMax(0);
+            mqttClient.setCleanSession(true);
         } catch (URISyntaxException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
@@ -71,10 +73,15 @@ public class BaseMQTTTest {
     @BeforeClass
     public static void startBrokerAndCreateClients() {
         if (STARTBROKER) {
+            ProcessBuilder brokerProcessBuilder = new ProcessBuilder("../build/emcuetiti_linux",
+                    "-p", Integer.toString(MQTT_PORT),
+                    "-t", TOPIC,
+                    "-t", TOPIC2,
+                    "-t", FULLSUBTOPIC);
+            brokerProcessBuilder.inheritIO();
+
             log("Starting broker...");
 
-            ProcessBuilder brokerProcessBuilder = new ProcessBuilder("../emcuetiti_linux");
-            brokerProcessBuilder.inheritIO();
             try {
                 brokerProcess = brokerProcessBuilder.start();
             } catch (IOException e) {

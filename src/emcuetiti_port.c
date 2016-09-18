@@ -2,6 +2,7 @@
 
 #include "emcuetiti.h"
 #include "emcuetiti_priv.h"
+#include "util.h"
 
 void emcuetiti_port_poll(emcuetiti_brokerhandle* broker,
 		emcuetiti_timestamp now) {

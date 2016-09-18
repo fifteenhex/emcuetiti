@@ -1,12 +1,16 @@
 include ../common.mk
 
-$(OUTPUTDIR)/libemcuetiti.a: $(OUTPUTDIR)/buffers.o \
+$(OUTPUTDIR)/libemcuetiti.a: \
+$(OUTPUTDIR)/buffers.o \
 $(OUTPUTDIR)/libmqtt.o \
 $(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_topic.o \
 $(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_port.o \
+$(OUTPUTDIR)/emcuetiti_client.o \
 $(OUTPUTDIR)/emcuetiti_port_router.o \
 $(OUTPUTDIR)/emcuetiti_port_remote.o 
 	$(AR) cr $@ $^
+
+#$(OUTPUTDIR)/sparsepointerarray.o \
 
 $(OUTPUTDIR)/buffers.o: buffers.c $(INCLUDEDIR)/buffers.h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -27,4 +31,7 @@ $(OUTPUTDIR)/emcuetiti_port_router.o: emcuetiti_port_router.c $(INCLUDEDIR)/emcu
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTPUTDIR)/emcuetiti_port_remote.o: emcuetiti_port_remote.c $(INCLUDEDIR)/emcuetiti_port_remote.h
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+$(OUTPUTDIR)/emcuetiti_client.o: emcuetiti_client.c $(INCLUDEDIR)/emcuetiti_client.h
 	$(CC) $(CFLAGS) -c $< -o $@
