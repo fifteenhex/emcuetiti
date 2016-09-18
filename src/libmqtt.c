@@ -459,6 +459,300 @@ static int libmqtt_readpkt_string(libmqtt_packetread* pkt,
 	return ret;
 }
 
+static int libmqtt_readpkt_connectstates(libmqtt_packetread* pkt, 			//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	switch (pkt->state) {
+	// connect var header
+
+	case LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN: {
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.publish.topiclen,
+				LIBMQTT_PACKETREADSTATE_CONNECT_PROTO);
+	}
+		break;
+	case LIBMQTT_PACKETREADSTATE_CONNECT_PROTO: {
+		uint8_t topicbyte;
+		ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &topicbyte, 1);
+		if (ret == 1) {
+			//payloadwritefunc(payloadwriteuserdata, &topicbyte, 1);
+			if (pkt->counter == pkt->varhdr.publish.topiclen) {
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL,
+						changeuserdata);
+			}
+		};
+	}
+		break;
+
+	case LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL:
+		ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.connect.level,
+				LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS);
+		break;
+
+	case LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS:
+		ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.connect.flags,
+				LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE);
+		break;
+
+	case LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.connect.keepalive,
+				LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTIDLEN);
+		break;
+
+		// connect payload
+	case LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTIDLEN:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.connect.clientidlen,
+				LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID);
+		break;
+
+	case LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID:
+		ret = libmqtt_readpkt_string(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, payloadwritefunc, payloadwriteuserdata,
+				pkt->varhdr.connect.clientidlen,
+				LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD);
+		break;
+		//
+	}
+	return ret;
+}
+
+static int libmqtt_readpkt_publishstates(libmqtt_packetread* pkt, 			//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPICLEN: {
+		libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.publish.topiclen,
+				LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC);
+	}
+		break;
+	case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC: {
+		bool publishhasmsgid = ((pkt->flags >> 1) & 0x3);
+		libmqtt_packetread_state nextstate =
+				publishhasmsgid ?
+						LIBMQTT_PACKETREADSTATE_PUBLISH_MSGID :
+						LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD;
+		ret = libmqtt_readpkt_string(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, payloadwritefunc, payloadwriteuserdata,
+				pkt->varhdr.publish.topiclen, nextstate);
+	}
+		break;
+	case LIBMQTT_PACKETREADSTATE_PUBLISH_MSGID:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.publish.msgid,
+				LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD);
+		break;
+	case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {
+		BUFFERS_STATICBUFFER_TO_BUFFER(pkt->buffer, pktbuffer);
+		// try to read
+		size_t remaining = (pkt->length - pkt->pos)
+				- buffers_buffer_available(&pktbuffer);
+
+		if (remaining > 0) {
+			ret = buffers_buffer_fill(&pktbuffer, remaining, readfunc,
+					readuserdata);
+			if (ret < 0)
+				break;
+		}
+
+		// try to flush
+		ret = buffers_buffer_flush(&pktbuffer, payloadwritefunc,
+				payloadwriteuserdata);
+		if (ret > 0)
+			libmqtt_readpkt_incposandcounter(pkt, ret);
+
+		libmqtt_readpkt_changestate(pkt, changefunc,
+				LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD, changeuserdata);
+	}
+		break;
+	}
+	return ret;
+}
+
+static int libmqtt_readpkt_subscribestates(libmqtt_packetread* pkt, 		//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_SUBSCRIBE_MSGID:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.subscribe.msgid,
+				LIBMQTT_PACKETREADSTATE_SUBSCRIBE_TOPICLEN);
+		break;
+	case LIBMQTT_PACKETREADSTATE_SUBSCRIBE_TOPICLEN:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.subscribe.topicfilterlen,
+				LIBMQTT_PACKETREADSTATE_SUBSCRIBE_TOPICFILTER);
+		break;
+	case LIBMQTT_PACKETREADSTATE_SUBSCRIBE_TOPICFILTER:
+		ret = libmqtt_readpkt_string(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, payloadwritefunc, payloadwriteuserdata,
+				pkt->varhdr.publish.topiclen,
+				LIBMQTT_PACKETREADSTATE_SUBSCRIBE_QOS);
+		break;
+	case LIBMQTT_PACKETREADSTATE_SUBSCRIBE_QOS:
+		ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.subscribe.topicfilterqos,
+				LIBMQTT_PACKETREADSTATE_SUBSCRIBE_TOPICLEN);
+		break;
+	}
+	return ret;
+}
+
+static int libmqtt_readpkt_unsubscribestates(libmqtt_packetread* pkt, 		//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_MSGID:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.subscribe.msgid,
+				LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICLEN);
+		break;
+	case LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICLEN:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.subscribe.topicfilterlen,
+				LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICFILTER);
+		break;
+	case LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICFILTER:
+		ret = libmqtt_readpkt_string(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, payloadwritefunc, payloadwriteuserdata,
+				pkt->varhdr.publish.topiclen,
+				LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICLEN);
+		break;
+	}
+	return ret;
+}
+
+static int libmqtt_readpkt_connackstates(libmqtt_packetread* pkt, 			//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_CONNACK_FLAGS:
+		ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.connack.ackflags,
+				LIBMQTT_PACKETREADSTATE_CONNACK_RETCODE);
+		break;
+	case LIBMQTT_PACKETREADSTATE_CONNACK_RETCODE:
+		ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.connack.returncode,
+				LIBMQTT_PACKETREADSTATE_FINISHED);
+		break;
+	}
+	return ret;
+}
+
+static int libmqtt_readpkt_commonstates(libmqtt_packetread* pkt, 			//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_TYPE: {
+		uint8_t typeandflags;
+		ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &typeandflags,
+				1);
+		if (ret == 1) {
+			pkt->type = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(typeandflags);
+
+			// check for valid packet type
+			if (pkt->type >= LIBMQTT_PACKETTYPE_CONNECT
+					&& pkt->type <= LIBMQTT_PACKETTYPE_DISCONNECT) {
+				pkt->flags = LIBMQTT_PACKETFLAGSFROMPACKETTYPEANDFLAGS(
+						typeandflags);
+				pkt->length = 1;
+				pkt->lenmultiplier = 1;
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_LEN, changeuserdata);
+			} else
+				libmqtt_readpkt_changestate(pkt, changefunc,
+						LIBMQTT_PACKETREADSTATE_ERROR, changeuserdata);
+		}
+	}
+		break;
+	case LIBMQTT_PACKETREADSTATE_LEN: {
+		uint8_t lenbyte;
+		ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &lenbyte, 1);
+		if (ret == 1) {
+			pkt->length += 1 + (LIBMQTT_LEN(lenbyte) * pkt->lenmultiplier);
+			pkt->lenmultiplier *= 128;
+			// last byte of the length has been read
+			if (LIBMQTT_ISLASTLENBYTE(lenbyte)) {
+				bool hasmessageid = (pkt->type == LIBMQTT_PACKETTYPE_PUBACK)
+						|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREC)
+						|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREL)
+						|| (pkt->type == LIBMQTT_PACKETTYPE_PUBCOMP)
+						|| (pkt->type == LIBMQTT_PACKETTYPE_SUBSCRIBE)
+						|| (pkt->type == LIBMQTT_PACKETTYPE_SUBACK)
+						|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBSCRIBE)
+						|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBACK);
+
+				libmqtt_packetread_state nextstate =
+						LIBMQTT_PACKETREADSTATE_ERROR;
+
+				switch (pkt->type) {
+				case LIBMQTT_PACKETTYPE_CONNECT:
+					nextstate = LIBMQTT_PACKETREADSTATE_CONNECT_START;
+					break;
+				case LIBMQTT_PACKETTYPE_CONNACK:
+					nextstate = LIBMQTT_PACKETREADSTATE_CONNACK_START;
+					break;
+				case LIBMQTT_PACKETTYPE_SUBSCRIBE:
+					nextstate = LIBMQTT_PACKETREADSTATE_SUBSCRIBE_START;
+					break;
+				case LIBMQTT_PACKETTYPE_UNSUBSCRIBE:
+					nextstate = LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_START;
+					break;
+				case LIBMQTT_PACKETTYPE_PUBLISH:
+					nextstate = LIBMQTT_PACKETREADSTATE_PUBLISH_START;
+				default:
+					if (hasmessageid)
+						nextstate = LIBMQTT_PACKETREADSTATE_MSGID;
+					break;
+				}
+
+				libmqtt_readpkt_changestate(pkt, changefunc, nextstate,
+						changeuserdata);
+			}
+		}
+	}
+		break;
+
+	case LIBMQTT_PACKETREADSTATE_MSGID: {
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.msgid,
+				LIBMQTT_PACKETREADSTATE_FINISHED);
+	}
+		break;
+	}
+	return ret;
+}
+
 int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
 		libmqtt_readfunc readfunc, void* readuserdata, 				//
@@ -473,190 +767,31 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 	while (pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED && ret >= 0) {
 		printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
 				pkt->pos);
-		switch (pkt->state) {
-		case LIBMQTT_PACKETREADSTATE_TYPE: {
-			uint8_t typeandflags;
-			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata,
-					&typeandflags, 1);
-			if (ret == 1) {
-				pkt->type = LIBMQTT_PACKETTYPEFROMPACKETTYPEANDFLAGS(
-						typeandflags);
 
-				// check for valid packet type
-				if (pkt->type >= LIBMQTT_PACKETTYPE_CONNECT
-						&& pkt->type <= LIBMQTT_PACKETTYPE_DISCONNECT) {
-					pkt->flags = LIBMQTT_PACKETFLAGSFROMPACKETTYPEANDFLAGS(
-							typeandflags);
-					pkt->length = 1;
-					pkt->lenmultiplier = 1;
-					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_LEN, changeuserdata);
-				} else
-					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_ERROR, changeuserdata);
-			}
-		}
-			break;
-		case LIBMQTT_PACKETREADSTATE_LEN: {
-			uint8_t lenbyte;
-			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &lenbyte,
-					1);
-			if (ret == 1) {
-				pkt->length += 1 + (LIBMQTT_LEN(lenbyte) * pkt->lenmultiplier);
-				pkt->lenmultiplier *= 128;
-				// last byte of the length has been read
-				if (LIBMQTT_ISLASTLENBYTE(lenbyte)) {
-					bool hasmessageid = (pkt->type == LIBMQTT_PACKETTYPE_PUBACK)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREC)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREL)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBCOMP)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_SUBSCRIBE)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_SUBACK)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBSCRIBE)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBACK);
-
-					// connects have a bunch of extra stuff in the var header
-					if (pkt->type == LIBMQTT_PACKETTYPE_CONNECT)
-						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN,
-								changeuserdata);
-					// connacks has a flags byte and a return code byte
-					else if (pkt->type == LIBMQTT_PACKETTYPE_CONNACK)
-						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_CONNFLAGS,
-								changeuserdata);
-					// publishes always have a topic
-					else if (pkt->type == LIBMQTT_PACKETTYPE_PUBLISH)
-						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_TOPICLEN,
-								changeuserdata);
-					// some packets have a message id
-					else if (hasmessageid)
-						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_MSGID, changeuserdata);
-					else
-						libmqtt_readpkt_changestate(pkt, changefunc,
-								LIBMQTT_PACKETREADSTATE_PAYLOAD,
-								changeuserdata);
-				}
-			}
-		}
-			break;
-
-			// connect var header
-
-		case LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN: {
-			libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.publish.topiclen,
-					LIBMQTT_PACKETREADSTATE_CONNECT_PROTO);
-		}
-			break;
-		case LIBMQTT_PACKETREADSTATE_CONNECT_PROTO: {
-			uint8_t topicbyte;
-			ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &topicbyte,
-					1);
-			if (ret == 1) {
-				//payloadwritefunc(payloadwriteuserdata, &topicbyte, 1);
-				if (pkt->counter == pkt->varhdr.publish.topiclen) {
-					libmqtt_readpkt_changestate(pkt, changefunc,
-							LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL,
-							changeuserdata);
-				}
-			};
-		}
-			break;
-
-		case LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL:
-			ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.connect.level,
-					LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS);
-			break;
-
-		case LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS:
-			ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.connect.flags,
-					LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE);
-			break;
-
-		case LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE:
-			ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.connect.keepalive,
-					LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTIDLEN);
-			break;
-
-			// connect payload
-		case LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTIDLEN:
-			ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.connect.clientidlen,
-					LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID);
-			break;
-
-		case LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID:
-			ret = libmqtt_readpkt_string(pkt, changefunc, changeuserdata,
+		if (pkt->state < LIBMQTT_PACKETREADSTATE_COMMON_END)
+			ret = libmqtt_readpkt_commonstates(pkt, changefunc, changeuserdata,
 					readfunc, readuserdata, payloadwritefunc,
-					payloadwriteuserdata, pkt->varhdr.connect.clientidlen,
-					LIBMQTT_PACKETREADSTATE_PAYLOAD);
-			break;
-			//
-
-		case LIBMQTT_PACKETREADSTATE_TOPICLEN: {
-			libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.publish.topiclen,
-					LIBMQTT_PACKETREADSTATE_TOPIC);
-		}
-			break;
-		case LIBMQTT_PACKETREADSTATE_TOPIC: {
-			bool publishhasmsgid = ((pkt->flags >> 1) & 0x3);
-			libmqtt_packetread_state nextstate =
-					publishhasmsgid ?
-							LIBMQTT_PACKETREADSTATE_MSGID :
-							LIBMQTT_PACKETREADSTATE_PAYLOAD;
-			ret = libmqtt_readpkt_string(pkt, changefunc, changeuserdata,
-					readfunc, readuserdata, payloadwritefunc,
-					payloadwriteuserdata, pkt->varhdr.publish.topiclen,
-					nextstate);
-		}
-			break;
-		case LIBMQTT_PACKETREADSTATE_MSGID:
-			ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.msgid,
-					LIBMQTT_PACKETREADSTATE_PAYLOAD);
-			break;
-		case LIBMQTT_PACKETREADSTATE_CONNFLAGS:
-			ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.connack.ackflags,
-					LIBMQTT_PACKETREADSTATE_CONNRET);
-			break;
-		case LIBMQTT_PACKETREADSTATE_CONNRET:
-			ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
-					readuserdata, &pkt->varhdr.connack.returncode,
-					LIBMQTT_PACKETREADSTATE_FINISHED);
-			break;
-		case LIBMQTT_PACKETREADSTATE_PAYLOAD: {
-			BUFFERS_STATICBUFFER_TO_BUFFER(pkt->buffer, pktbuffer);
-			// try to read
-			size_t remaining = (pkt->length - pkt->pos)
-					- buffers_buffer_available(&pktbuffer);
-
-			if (remaining > 0) {
-				ret = buffers_buffer_fill(&pktbuffer, remaining, readfunc,
-						readuserdata);
-				if (ret < 0)
-					break;
-			}
-
-			// try to flush
-			ret = buffers_buffer_flush(&pktbuffer, payloadwritefunc,
 					payloadwriteuserdata);
-			if (ret > 0)
-				libmqtt_readpkt_incposandcounter(pkt, ret);
-
-			libmqtt_readpkt_changestate(pkt, changefunc,
-					LIBMQTT_PACKETREADSTATE_PAYLOAD, changeuserdata);
-		}
-			break;
-		}
-
+		else if (pkt->state < LIBMQTT_PACKETREADSTATE_CONNECT_END)
+			ret = libmqtt_readpkt_connectstates(pkt, changefunc, changeuserdata,
+					readfunc, readuserdata, payloadwritefunc,
+					payloadwriteuserdata);
+		else if (pkt->state < LIBMQTT_PACKETREADSTATE_CONNACK_END)
+			ret = libmqtt_readpkt_connackstates(pkt, changefunc, changeuserdata,
+					readfunc, readuserdata, payloadwritefunc,
+					payloadwriteuserdata);
+		else if (pkt->state < LIBMQTT_PACKETREADSTATE_SUBSCRIBE_END)
+			ret = libmqtt_readpkt_subscribestates(pkt, changefunc,
+					changeuserdata, readfunc, readuserdata, payloadwritefunc,
+					payloadwriteuserdata);
+		else if (pkt->state < LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_END)
+			ret = libmqtt_readpkt_unsubscribestates(pkt, changefunc,
+					changeuserdata, readfunc, readuserdata, payloadwritefunc,
+					payloadwriteuserdata);
+		else if (pkt->state < LIBMQTT_PACKETREADSTATE_PUBLISH_END)
+			ret = libmqtt_readpkt_publishstates(pkt, changefunc, changeuserdata,
+					readfunc, readuserdata, payloadwritefunc,
+					payloadwriteuserdata);
 	}
 
 	if (ret <= LIBMQTT_EFATAL)
@@ -665,4 +800,3 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 
 	return ret;
 }
-

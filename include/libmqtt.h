@@ -70,25 +70,45 @@ typedef struct {
 typedef enum {
 	LIBMQTT_PACKETREADSTATE_TYPE,		// packet type
 	LIBMQTT_PACKETREADSTATE_LEN,		// packet remaining length
-
-	// varheader processing
-	LIBMQTT_PACKETREADSTATE_TOPICLEN,// packet topic length, only valid for publish
-	LIBMQTT_PACKETREADSTATE_TOPIC,		// packet topic, only valid for publish
 	LIBMQTT_PACKETREADSTATE_MSGID,// packet message id, only valid for packets that need it
+	LIBMQTT_PACKETREADSTATE_COMMON_END,
 
-	LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN,	//
-	LIBMQTT_PACKETREADSTATE_CONNECT_PROTO,		//
-	LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL, //
-	LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS,		//
-	LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE,	//
-	LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTIDLEN, //
-	LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID,	//
+	LIBMQTT_PACKETREADSTATE_CONNECT_START = 10,
+	LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEN = 10,	//
+	LIBMQTT_PACKETREADSTATE_CONNECT_PROTO,			//
+	LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL, 	//
+	LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS,			//
+	LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE,		//
+	LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTIDLEN,	//
+	LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID,		//
+	LIBMQTT_PACKETREADSTATE_CONNECT_END,
 
-	LIBMQTT_PACKETREADSTATE_CONNFLAGS,// connection flags, only valid for connack
-	LIBMQTT_PACKETREADSTATE_CONNRET,// connection return code, only valid for connack
+	LIBMQTT_PACKETREADSTATE_CONNACK_START = 20,
+	LIBMQTT_PACKETREADSTATE_CONNACK_FLAGS = 20,	// connection flags, only valid for connack
+	LIBMQTT_PACKETREADSTATE_CONNACK_RETCODE,// connection return code, only valid for connack
+	LIBMQTT_PACKETREADSTATE_CONNACK_END,
 
-	LIBMQTT_PACKETREADSTATE_PAYLOAD,// packet payload, only valid for packets that have a payload
-	LIBMQTT_PACKETREADSTATE_FINISHED,	// packet has been read completely
+	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_START = 30,
+	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_MSGID = 30,
+	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_TOPICLEN, //
+	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_TOPICFILTER, //
+	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_QOS, //
+	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_END,
+
+	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_START = 40,
+	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_MSGID = 40,
+	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICLEN, //
+	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICFILTER, //
+	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_END,
+
+	LIBMQTT_PACKETREADSTATE_PUBLISH_START = 50,
+	LIBMQTT_PACKETREADSTATE_PUBLISH_TOPICLEN = 50, // packet topic length, only valid for publish
+	LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC, // packet topic, only valid for publish
+	LIBMQTT_PACKETREADSTATE_PUBLISH_MSGID,
+	LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD, // packet payload, only valid for packets that have a payload
+	LIBMQTT_PACKETREADSTATE_PUBLISH_END,
+
+	LIBMQTT_PACKETREADSTATE_FINISHED = 100,	// packet has been read completely
 	LIBMQTT_PACKETREADSTATE_ERROR
 } libmqtt_packetread_state;
 
@@ -106,6 +126,12 @@ typedef struct {
 
 typedef struct {
 	uint16_t msgid;
+	uint16_t topicfilterlen;
+	uint8_t topicfilterqos;
+} libmqtt_packet_subscribe;
+
+typedef struct {
+	uint16_t msgid;
 	uint16_t topiclen;
 } libmqtt_packet_publish;
 
@@ -114,14 +140,15 @@ typedef union {
 	libmqtt_packet_connect connect;
 	libmqtt_packet_connack connack;
 	libmqtt_packet_publish publish;
-} libmqtt_packetread_varhdr;
+	libmqtt_packet_subscribe subscribe;
+} libmqtt_packetread_registers;
 
 typedef struct {
 	libmqtt_packetread_state state;
 	uint8_t type;
 	uint8_t flags;
 	size_t length;
-	libmqtt_packetread_varhdr varhdr;
+	libmqtt_packetread_registers varhdr;
 	// secret, don't touch
 	size_t pos;
 	unsigned lenmultiplier;

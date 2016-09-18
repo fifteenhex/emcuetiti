@@ -387,7 +387,7 @@ static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
 	switch (cs->incomingpacket.type) {
 	case LIBMQTT_PACKETTYPE_PUBLISH:
 		switch (cs->incomingpacket.state) {
-		case LIBMQTT_PACKETREADSTATE_PAYLOAD:
+		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD:
 			printf("wr: %c[%02x]\n", buffer[0], buffer[0]);
 			ret = 1;
 			break;

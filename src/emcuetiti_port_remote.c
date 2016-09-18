@@ -62,13 +62,13 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 
 	if (portdata->statedata.ready.pktread.type == LIBMQTT_PACKETTYPE_PUBLISH) {
 		switch (portdata->statedata.ready.pktread.state) {
-		case LIBMQTT_PACKETREADSTATE_TOPIC: {
+		case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC: {
 			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuf);
 			ret = emcuetiti_port_remote_munchtopicpart(portdata, buffer, len,
 					&topbuf);
 		}
 			break;
-		case LIBMQTT_PACKETREADSTATE_PAYLOAD: {
+		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {
 			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
 			ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
 		}
@@ -100,10 +100,10 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
 		buffers_buffer_reset(&pubbuff);
 	}
 		break;
-	case LIBMQTT_PACKETREADSTATE_TOPIC:
+	case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:
 		printf("tl:%u\n", pkt->varhdr.publish.topiclen);
 		break;
-	case LIBMQTT_PACKETREADSTATE_PAYLOAD:
+	case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD:
 		printf("pl:%u\n", pkt->length - pkt->pos);
 		processtopicpart(portdata, &topbuff);
 		break;
