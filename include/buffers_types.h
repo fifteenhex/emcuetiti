@@ -5,6 +5,7 @@
 typedef struct {
 	size_t head;
 	size_t tail;
+	unsigned refs;
 } buffers_bufferhead;
 
 typedef struct {

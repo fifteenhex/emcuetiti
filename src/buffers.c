@@ -90,3 +90,9 @@ int buffers_buffer_fill(buffers_buffer* buffer, size_t waiting,
 	}
 	return ret;
 }
+
+int buffers_buffer_emptyinto(buffers_buffer* src, uint8_t* dst, size_t max) {
+	size_t cpysz = size_min(src->head->head, max);
+	memcpy(dst, src->buffer, cpysz);
+	return cpysz;
+}

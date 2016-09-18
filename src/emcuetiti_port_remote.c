@@ -82,7 +82,7 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 }
 
 static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
-		void* userdata) {
+		libmqtt_packetread_state previousstate, void* userdata) {
 
 	emcuetiti_port_remote_portdata* portdata =
 			(emcuetiti_port_remote_portdata*) userdata;

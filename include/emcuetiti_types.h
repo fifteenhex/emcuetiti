@@ -4,6 +4,7 @@
 
 #include "emcuetiti_config.h"
 #include "libmqtt.h"
+#include "buffers_types.h"
 
 typedef EMCUETITI_CONFIG_TIMESTAMPTYPE emcuetiti_timestamp;
 
@@ -98,17 +99,16 @@ typedef struct {
 struct emcuetiti_clientstate {
 	emcuetiti_clienthandle* client;
 	char clientid[LIBMQTT_CLIENTID_MAXLENGTH + 1];
+
 	uint16_t keepalive;
 	EMCUETITI_CONFIG_TIMESTAMPTYPE lastseen;
 
 	unsigned numsubscriptions;
 	emcuetiti_subscription subscriptions[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
 
-	uint8_t buffer[EMCUETITI_CONFIG_CLIENTBUFFERSZ];
-	unsigned bufferpos;
+	BUFFERS_STATICBUFFER(buffer, EMCUETITI_CONFIG_CLIENTBUFFERSZ + 1);
 
 	emcuetiti_clientconnectionstate state;
-//emcuetiti_clientreadstate readstate;
 
 	libmqtt_packetread incomingpacket;
 

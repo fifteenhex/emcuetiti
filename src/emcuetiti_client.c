@@ -1,9 +1,12 @@
 #include <string.h>
 
+#include <stdio.h>
+
 #include "emcuetiti_topic.h"
 #include "emcuetiti_client.h"
 #include "emcuetiti_error.h"
 
+#include "buffers.h"
 #include "libmqtt_priv.h"
 #include "util.h"
 
@@ -70,7 +73,6 @@ static void emcuetiti_disconnectclient(emcuetiti_brokerhandle* broker,
 #endif
 
 	cs->state = CLIENTSTATE_DISCONNECTED;
-	//cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
 static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
@@ -96,85 +98,60 @@ static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
 }
 
 static void emcuetiti_handleinboundpacket_publish(
-		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs,
-		uint8_t flags) {
+		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+
 	broker->callbacks->log(broker, "handling publish");
 
-	libmqtt_qos qos = (flags >> 1) & 0x3;
-	uint16_t messageid;
+	/*
+	 libmqtt_qos qos = (flags >> 1) & 0x3;
+	 uint16_t messageid;
 
-	uint16_t topiclen;
-	emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
-			cs->buffer, &topiclen, NULL);
+	 uint16_t topiclen;
+	 emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
+	 cs->buffer, &topiclen, NULL);
 
-	if (t != NULL) {
-		cs->publishtopic = t;
-		cs->publishpayloadlen = cs->varheaderandpayloadlen - (topiclen + 2);
-		//cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
-		cs->bufferpos = topiclen + 2;
+	 if (t != NULL) {
+	 cs->publishtopic = t;
+	 cs->publishpayloadlen = cs->varheaderandpayloadlen - (topiclen + 2);
+	 //cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
+	 cs->bufferpos = topiclen + 2;
 
-		if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
-			messageid = (cs->buffer[cs->bufferpos] << 8)
-					| cs->buffer[cs->bufferpos + 1];
-			cs->bufferpos += 2;
-		}
+	 if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
+	 messageid = (cs->buffer[cs->bufferpos] << 8)
+	 | cs->buffer[cs->bufferpos + 1];
+	 cs->bufferpos += 2;
+	 }
 
-		for (int p = 0; p < ARRAY_ELEMENTS(broker->ports); p++) {
-			if (broker->ports[p] != NULL) {
-				broker->callbacks->log(broker, "dispatching publish to port %d",
-						p);
-				if (broker->ports[p]->publishreadycallback != NULL)
-					broker->ports[p]->publishreadycallback(broker, cs->client,
-							t, cs->publishpayloadlen);
-			}
-		}
+	 for (int p = 0; p < ARRAY_ELEMENTS(broker->ports); p++) {
+	 if (broker->ports[p] != NULL) {
+	 broker->callbacks->log(broker, "dispatching publish to port %d",
+	 p);
+	 if (broker->ports[p]->publishreadycallback != NULL)
+	 broker->ports[p]->publishreadycallback(broker, cs->client,
+	 t, cs->publishpayloadlen);
+	 }
+	 }
 
-		if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
-			libmqtt_construct_puback(
-					emcuetiti_client_resolvewritefunc(broker, cs),
-					cs->client->userdata, messageid);
-		}
-	} else {
-		broker->callbacks->log(broker, "publish to invalid topic");
-		emcuetiti_disconnectclient(broker, cs);
-	}
+	 if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
+	 libmqtt_construct_puback(
+	 emcuetiti_client_resolvewritefunc(broker, cs),
+	 cs->client->userdata, messageid);
+	 }
+	 } else {
+	 broker->callbacks->log(broker, "publish to invalid topic");
+	 emcuetiti_disconnectclient(broker, cs);
+	 }*/
 }
 
 static void emcuetiti_handleinboardpacket_connect(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	void* userdata = cs->client->userdata;
 
-	uint8_t* buff = cs->buffer;
-	uint16_t protnamelen = (*(buff++) << 8) | *(buff++);
-	char protocolname[5];
-	memcpy(protocolname, buff, protnamelen);
-	protocolname[protnamelen] = '\0';
-	buff += protnamelen;
-
-	uint8_t level = *(buff++);
-	uint8_t flags = *(buff++);
-
-	cs->keepalive = (*(buff++) << 8) | *(buff++);
-
-	uint16_t idlen = (*(buff++) << 8) | *(buff++);
-	memcpy(cs->clientid, buff, idlen);
-	cs->clientid[idlen] = '\0';
-	buff += idlen;
-
-	if (flags & LIBMQTT_FLAGS_CONNECT_WILLFLAG) {
-
-	}
-
-	if (flags & LIBMQTT_FLAGS_CONNECT_USERNAMEFLAG) {
-
-	}
-
-	if (flags & LIBMQTT_FLAGS_CONNECT_PASSWORDFLAG) {
-
-	}
+	cs->keepalive = cs->incomingpacket.varhdr.connect.keepalive;
+	int level = cs->incomingpacket.varhdr.connect.level;
 
 	broker->callbacks->log(broker,
-			"protoname %s, level %d, keepalive %d, clientid %s ", protocolname,
+			"protoname %s, level %d, keepalive %d, clientid %s ", NULL,
 			(int) level, (int) cs->keepalive, cs->clientid);
 
 	if (broker->callbacks->authenticatecallback == NULL
@@ -292,74 +269,7 @@ static void emcuetiti_handleinboundpacket_pingreq(
 	broker->callbacks->log(broker, "pingreq from %s", cs->clientid);
 	libmqtt_construct_pingresp(emcuetiti_client_resolvewritefunc(broker, cs),
 			cs->client->userdata);
-	//cs->readstate = CLIENTREADSTATE_IDLE;
 }
-
-/*
- static void emcuetiti_poll_read(emcuetiti_brokerhandle* broker,
- emcuetiti_clientstate* cs,
- EMCUETITI_CONFIG_TIMESTAMPTYPE now) {
-
- int bufferremaining = EMCUETITI_CONFIG_CLIENTBUFFERSZ - cs->bufferpos;
-
- if (bufferremaining == 0) {
- broker->callbacks->log(broker, "client buffer is full");
- return;
- }
-
- uint8_t* offsetbuffer = cs->buffer + cs->bufferpos;
- void* userdata = cs->client->userdata;
- int read;
-
- emcuetiti_readfunc readfunc = cs->client->ops->readfunc;
-
- switch (cs->readstate) {
- case CLIENTREADSTATE_IDLE:
- if (cs->client->ops->readytoread(cs->client->userdata)) {
- cs->readstate = CLIENTREADSTATE_TYPE;
- cs->bufferpos = 0;
- }
- break;
- case CLIENTREADSTATE_TYPE:
- if (readfunc(userdata, &(cs->packettype), 1) == 1) {
- cs->readstate = CLIENTREADSTATE_REMAININGLEN;
- }
- break;
- case CLIENTREADSTATE_REMAININGLEN:
- if (readfunc(userdata, offsetbuffer, 1) == 1) {
- if (LIBMQTT_ISLASTLENBYTE(*offsetbuffer)) {
- libmqtt_decodelength(cs->buffer, &cs->varheaderandpayloadlen);
- if (cs->varheaderandpayloadlen > 0) {
- cs->readstate = CLIENTREADSTATE_PAYLOAD;
- cs->remainingbytes = cs->varheaderandpayloadlen;
- } else
- cs->readstate = CLIENTREADSTATE_COMPLETE;
-
- broker->callbacks->log(broker, "%d bytes remaining",
- cs->remainingbytes);
- // length is stashed, reset buffer
- cs->bufferpos = 0;
- } else
- cs->bufferpos++;
- }
- break;
- case CLIENTREADSTATE_PAYLOAD:
- if (cs->remainingbytes > bufferremaining) {
- broker->callbacks->log(broker,
- "not enough space in buffer for remaining bytes");
- } else {
- read = readfunc(userdata, offsetbuffer, cs->remainingbytes);
- if (read > 0) {
- cs->remainingbytes -= read;
- if (cs->remainingbytes == 0) {
- cs->readstate = CLIENTREADSTATE_COMPLETE;
- cs->lastseen = now;
- }
- }
- }
- break;
- }
- }*/
 
 static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		emcuetiti_clientstate* cs) {
@@ -368,12 +278,9 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 	case LIBMQTT_PACKETTYPE_PINGREQ:
 		emcuetiti_handleinboundpacket_pingreq(broker, cs);
 		break;
-		/*
-		 case LIBMQTT_PACKETTYPE_PUBLISH:
-		 emcuetiti_handleinboundpacket_publish(broker, cs,
-		 cs->incomingpacket.flags);
-		 break;
-		 */
+	case LIBMQTT_PACKETTYPE_PUBLISH:
+		emcuetiti_handleinboundpacket_publish(broker, cs);
+		break;
 // uncommon
 	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
 		emcuetiti_handleinboundpacket_subscribe(broker, cs);
@@ -454,20 +361,63 @@ void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* client, uint8_t* buffer, size_t len) {
 
-	emcuetiti_clientstate* cs;
-	for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
-		if (broker->clients[i].client == client) {
-			cs = &(broker->clients[i]);
+	/*emcuetiti_clientstate* cs;
+	 for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
+	 if (broker->clients[i].client == client) {
+	 cs = &(broker->clients[i]);
+	 }
+	 }
+
+	 len = size_min(len, cs->publishpayloadlen);
+
+	 memcpy(buffer, cs->buffer + cs->bufferpos, len);
+
+	 //cs->readstate = CLIENTREADSTATE_IDLE;*/
+
+	return 0;
+}
+
+static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
+		size_t len) {
+
+	emcuetiti_clientstate* cs = (emcuetiti_clientstate*) userdata;
+
+	int ret = len;
+
+	switch (cs->incomingpacket.type) {
+	case LIBMQTT_PACKETTYPE_PUBLISH:
+		switch (cs->incomingpacket.state) {
+		case LIBMQTT_PACKETREADSTATE_PAYLOAD:
+			printf("wr: %c[%02x]\n", buffer[0], buffer[0]);
+			ret = 1;
+			break;
 		}
+		break;
+	case LIBMQTT_PACKETTYPE_CONNECT: {
+		BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, cidb);
+		ret = buffers_buffer_append(&cidb, buffer, len);
+	}
+		break;
 	}
 
-	len = size_min(len, cs->publishpayloadlen);
+	return ret;
+}
 
-	memcpy(buffer, cs->buffer + cs->bufferpos, len);
+static int statechange(libmqtt_packetread* pkt,
+		libmqtt_packetread_state previousstate, void* userdata) {
 
-	//cs->readstate = CLIENTREADSTATE_IDLE;
+	emcuetiti_clientstate* cs = (emcuetiti_clientstate*) userdata;
 
-	return len;
+	switch (previousstate) {
+	case LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID: {
+		BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, clientbuffer);
+		size_t end = buffers_buffer_emptyinto(&clientbuffer, cs->clientid,
+				sizeof(cs->clientid) - 1);
+		cs->clientid[end] = '\0';
+	}
+		break;
+	}
+	return 0;
 }
 
 void emcuetiti_client_poll(emcuetiti_brokerhandle* broker,
@@ -488,29 +438,17 @@ void emcuetiti_client_poll(emcuetiti_brokerhandle* broker,
 				case CLIENTSTATE_CONNECTED:
 					if (isconnectedfunc(cs->client->userdata)) {
 						if (readytoreadfunc(cs->client->userdata)) {
-							libmqtt_readpkt(&cs->incomingpacket,
-							NULL, NULL,
+							libmqtt_readpkt(&cs->incomingpacket, statechange,
+									cs,
 									emcuetiti_client_resolvereadfunc(broker,
 											cs), cs->client->userdata,
-									NULL, NULL);
-
+									emcuetiti_client_writefunc, cs);
 							if (cs->incomingpacket.state
 									== LIBMQTT_PACKETREADSTATE_FINISHED) {
 								emcuetiti_handleinboundpacket(broker, cs);
 							}
 						}
-
-						//switch (cs->readstate) {
-						//case CLIENTREADSTATE_COMPLETE:
-						//
-						//	break;
-						//default:
-						//	emcuetiti_poll_read(broker, cs, now);
-						//	break;
-						//}
-
 						emcuetiti_broker_poll_checkkeepalive(broker, cs, now);
-
 					} else
 						emcuetiti_disconnectclient(broker, cs);
 

@@ -81,6 +81,8 @@ typedef enum {
 	LIBMQTT_PACKETREADSTATE_CONNECT_PROTOLEVEL, //
 	LIBMQTT_PACKETREADSTATE_CONNECT_FLAGS,		//
 	LIBMQTT_PACKETREADSTATE_CONNECT_KEEPALIVE,	//
+	LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTIDLEN, //
+	LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID,	//
 
 	LIBMQTT_PACKETREADSTATE_CONNFLAGS,// connection flags, only valid for connack
 	LIBMQTT_PACKETREADSTATE_CONNRET,// connection return code, only valid for connack
@@ -94,6 +96,7 @@ typedef struct {
 	uint8_t level;
 	uint8_t flags;
 	uint16_t keepalive;
+	uint16_t clientidlen;
 } libmqtt_packet_connect;
 
 typedef struct {
@@ -134,7 +137,8 @@ typedef int (*libmqtt_readfunc)(void* userdata, uint8_t* buffer, size_t len);
 typedef int (*libmqtt_topicwriter)(libmqtt_writefunc writefunc,
 		void* writefuncuserdata, void* userdata);
 
-typedef int (*libmqtt_packetreadchange)(libmqtt_packetread* pkt, void* userdata);
+typedef int (*libmqtt_packetreadchange)(libmqtt_packetread* pkt,
+		libmqtt_packetread_state previousstate, void* userdata);
 
 // User API
 
