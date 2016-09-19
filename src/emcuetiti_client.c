@@ -111,7 +111,8 @@ static void emcuetiti_handleinboundpacket_publish(
 
 		emcuetiti_port_onpublishready(broker, cs->registers.publish.topic,
 				&payloadbuffer);
-	}
+	} else
+		broker->callbacks->log(broker, "dafuq?");
 
 	buffers_buffer_unref(&payloadbuffer);
 
@@ -173,8 +174,9 @@ static void emcuetiti_handleinboundpacket_subscribe(
 						cs->numsubscriptions++;
 						returncodes[i] = 0;
 						broker->callbacks->log(broker,
-								"inserted subscription into %s, now have %d",
-								cs->clientid, cs->numsubscriptions);
+								"inserted subscription to %s into %s, now have %d",
+								topic->topicpart, cs->clientid,
+								cs->numsubscriptions);
 						break;
 					}
 				}
@@ -406,6 +408,10 @@ static int statechange(libmqtt_packetread* pkt,
 		cs->clientid[end] = '\0';
 		buffers_buffer_reset(&clientbuffer);
 	}
+		break;
+	case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:
+		buffers_buffer_terminate(&clientbuffer);
+		processtopicpart(&clientbuffer, cs);
 		break;
 	case LIBMQTT_PACKETREADSTATE_SUBSCRIBE_QOS:
 	case LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICFILTER:

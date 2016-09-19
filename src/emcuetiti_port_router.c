@@ -17,7 +17,7 @@ static int emcuetiti_port_publishreadycallback(emcuetiti_brokerhandle* broker,
 	emcuetiti_publish pub = { .topic = topic, //
 			.readfunc = buffers_buffer_readfunc, //
 			.resetfunc = buffers_buffer_resetfunc, //
-			.userdata = &bufferreference, //
+			.userdata = &bufferreference.buffer, //
 			.payloadln = buffers_buffer_available(buffer) };
 
 	emcuetiti_broker_publish(broker, &pub);
