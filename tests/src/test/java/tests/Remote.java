@@ -7,10 +7,7 @@ import io.moquette.interception.InterceptHandler;
 import io.moquette.interception.messages.*;
 import io.moquette.server.Server;
 import io.moquette.server.config.MemoryConfig;
-import org.fusesource.mqtt.client.BlockingConnection;
-import org.fusesource.mqtt.client.MQTT;
-import org.fusesource.mqtt.client.QoS;
-import org.fusesource.mqtt.client.Topic;
+import org.fusesource.mqtt.client.*;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -135,44 +132,48 @@ public class Remote extends BaseMQTTTest {
             throw new RuntimeException(e);
         }
 
-        /*try {
+        try {
             localClient.receive(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }*/
+        }
 
         try {
-            Thread.sleep((60 * 1000) * 20);
+            Thread.sleep((60 * 1000));
         } catch (InterruptedException ie) {
 
         }
     }
 
-    /*
+
     @Test
     public void localToRemote() {
         getBoolFuture(emcuetitiConnected);
         getBoolFuture(emcuetitiSubbed);
 
         String payload = "toremote";
+        byte[] payloadbytes = payload.getBytes();
         try {
-            localClient.publish(TOPICLOCALTOREMOTE, payload.getBytes(), QoS.AT_MOST_ONCE, false);
+            localClient.publish(TOPICLOCALTOREMOTE, payloadbytes, QoS.AT_MOST_ONCE, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
         try {
-            remoteClient.receive(30, TimeUnit.SECONDS);
+            Message message = remoteClient.receive(30, TimeUnit.SECONDS);
+            assert message != null;
+            String payloadIn = new String(message.getPayload(), "UTF-8");
+            assert payloadIn.equals(payload) : "wanted [" + payload + "] got [" + payloadIn + "]";
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
         try {
-            Thread.sleep((60 * 1000) * 20);
+            Thread.sleep((60 * 1000));
         } catch (InterruptedException ie) {
 
         }
-    }*/
+    }
 
 
 }

@@ -95,14 +95,19 @@ typedef enum {
 	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_QOS, //
 	LIBMQTT_PACKETREADSTATE_SUBSCRIBE_END,
 
-	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_START = 40,
-	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_MSGID = 40,
+	LIBMQTT_PACKETREADSTATE_SUBACK_START = 40,
+	LIBMQTT_PACKETREADSTATE_SUBACK_MSGID = 40,
+	LIBMQTT_PACKETREADSTATE_SUBACK_RESULT, //
+	LIBMQTT_PACKETREADSTATE_SUBACK_END,
+
+	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_START = 50,
+	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_MSGID = 50,
 	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICLEN, //
 	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICFILTER, //
 	LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_END,
 
-	LIBMQTT_PACKETREADSTATE_PUBLISH_START = 50,
-	LIBMQTT_PACKETREADSTATE_PUBLISH_TOPICLEN = 50, // packet topic length, only valid for publish
+	LIBMQTT_PACKETREADSTATE_PUBLISH_START = 60,
+	LIBMQTT_PACKETREADSTATE_PUBLISH_TOPICLEN = 60, // packet topic length, only valid for publish
 	LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC, // packet topic, only valid for publish
 	LIBMQTT_PACKETREADSTATE_PUBLISH_MSGID,
 	LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD, // packet payload, only valid for packets that have a payload
@@ -132,6 +137,11 @@ typedef struct {
 
 typedef struct {
 	uint16_t msgid;
+	uint8_t result;
+} libmqtt_packet_suback;
+
+typedef struct {
+	uint16_t msgid;
 	uint16_t topicfilterlen;
 } libmqtt_packet_unsubscribe;
 
@@ -146,6 +156,7 @@ typedef union {
 	libmqtt_packet_connack connack;
 	libmqtt_packet_publish publish;
 	libmqtt_packet_subscribe subscribe;
+	libmqtt_packet_suback suback;
 	libmqtt_packet_unsubscribe unsubscribe;
 } libmqtt_packetread_registers;
 

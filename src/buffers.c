@@ -6,6 +6,7 @@
 
 void buffers_staticbuffer_tobuffer(uint8_t* staticbuffer, size_t* sz,
 		buffers_buffer* buffer) {
+
 	buffers_bufferhead* head = (buffers_bufferhead*) staticbuffer;
 
 	buffer->size = sz;
@@ -113,15 +114,17 @@ void buffers_buffer_terminate(buffers_buffer* target) {
 }
 
 bool buffers_buffer_inuse(buffers_buffer* target) {
-	return *target->refs > 0;
+	return (*target->refs) > 0;
 }
 
 void buffers_buffer_ref(buffers_buffer* target) {
-	*target->refs = *target->refs++;
+	int refs = *target->refs;
+	*target->refs = refs + 1;
 }
 
 void buffers_buffer_unref(buffers_buffer* target) {
-	*target->refs = *target->refs--;
+	int refs = *target->refs;
+	*target->refs = refs - 1;
 	if (!buffers_buffer_inuse(target))
 		buffers_buffer_reset(target);
 }

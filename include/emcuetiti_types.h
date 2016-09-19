@@ -18,7 +18,8 @@ typedef struct emcuetiti_topichandle emcuetiti_topichandle;
 // function prototypes
 
 typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_brokerhandle* broker,
-		emcuetiti_topichandle* topic, buffers_buffer* buffer);
+		emcuetiti_topichandle* topic, buffers_buffer* buffer, void* portdata);
+
 typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
 typedef bool (*emcuetiti_isconnected)(void* userdata);
 

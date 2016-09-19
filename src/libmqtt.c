@@ -615,6 +615,28 @@ static int libmqtt_readpkt_subscribestates(libmqtt_packetread* pkt, 		//
 	return ret;
 }
 
+static int libmqtt_readpkt_subackstates(libmqtt_packetread* pkt, 		//
+		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
+		libmqtt_readfunc readfunc, void* readuserdata, 				//
+		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	int ret = 0;
+
+	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_SUBACK_MSGID:
+		ret = libmqtt_readpkt_u16(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.suback.msgid,
+				LIBMQTT_PACKETREADSTATE_SUBACK_RESULT);
+		break;
+	case LIBMQTT_PACKETREADSTATE_SUBACK_RESULT:
+		ret = libmqtt_readpkt_u8(pkt, changefunc, changeuserdata, readfunc,
+				readuserdata, &pkt->varhdr.suback.result,
+				LIBMQTT_PACKETREADSTATE_SUBACK_RESULT);
+		break;
+	}
+	return ret;
+}
+
 static int libmqtt_readpkt_unsubscribestates(libmqtt_packetread* pkt, 		//
 		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
 		libmqtt_readfunc readfunc, void* readuserdata, 				//
@@ -717,6 +739,9 @@ static int libmqtt_readpkt_commonstates(libmqtt_packetread* pkt, 			//
 				case LIBMQTT_PACKETTYPE_SUBSCRIBE:
 					nextstate = LIBMQTT_PACKETREADSTATE_SUBSCRIBE_START;
 					break;
+				case LIBMQTT_PACKETTYPE_SUBACK:
+					nextstate = LIBMQTT_PACKETREADSTATE_SUBACK_START;
+					break;
 				case LIBMQTT_PACKETTYPE_UNSUBSCRIBE:
 					nextstate = LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_START;
 					break;
@@ -727,7 +752,6 @@ static int libmqtt_readpkt_commonstates(libmqtt_packetread* pkt, 			//
 							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREC)
 							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBREL)
 							|| (pkt->type == LIBMQTT_PACKETTYPE_PUBCOMP)
-							|| (pkt->type == LIBMQTT_PACKETTYPE_SUBACK)
 							|| (pkt->type == LIBMQTT_PACKETTYPE_UNSUBACK);
 					if (hasmessageid)
 						nextstate = LIBMQTT_PACKETREADSTATE_MSGID;
@@ -766,8 +790,8 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 		memset(pkt, 0, sizeof(*pkt));
 
 	while (pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED && ret >= 0) {
-		printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
-				pkt->pos);
+		//printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
+		//		pkt->pos);
 
 		if (pkt->state < LIBMQTT_PACKETREADSTATE_COMMON_END)
 			ret = libmqtt_readpkt_commonstates(pkt, changefunc, changeuserdata,
@@ -784,6 +808,10 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 		else if (pkt->state < LIBMQTT_PACKETREADSTATE_SUBSCRIBE_END)
 			ret = libmqtt_readpkt_subscribestates(pkt, changefunc,
 					changeuserdata, readfunc, readuserdata, payloadwritefunc,
+					payloadwriteuserdata);
+		else if (pkt->state < LIBMQTT_PACKETREADSTATE_SUBACK_END)
+			ret = libmqtt_readpkt_subackstates(pkt, changefunc, changeuserdata,
+					readfunc, readuserdata, payloadwritefunc,
 					payloadwriteuserdata);
 		else if (pkt->state < LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_END)
 			ret = libmqtt_readpkt_unsubscribestates(pkt, changefunc,

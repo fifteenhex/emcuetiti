@@ -145,18 +145,22 @@ emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 
 int emcuetiti_topic_munchtopicpart(const uint8_t* buffer, size_t len,
 		buffers_buffer* topicbuffer, emcuetiti_topicpartprocessor processor,
-		void* userdata) {
+		emcuetiti_wildcardprocessor wildcardprocessor, void* userdata) {
 
 	size_t consumed;
-	bool partcomplete = false;
+
+	bool topicpart = false;
+	bool thisandabovewildcard = false;
+
 	for (consumed = 0; consumed < len; consumed++) {
 		bool exit = false;
 		switch (buffer[consumed]) {
 		case '/':
-			partcomplete = true;
+			topicpart = true;
 			exit = true;
 			break;
 		case '#':
+			thisandabovewildcard = true;
 			exit = true;
 			break;
 		}
@@ -165,12 +169,14 @@ int emcuetiti_topic_munchtopicpart(const uint8_t* buffer, size_t len,
 	}
 
 	buffers_buffer_append(topicbuffer, buffer, consumed);
-	if (partcomplete && buffers_buffer_available(topicbuffer) > 0) {
+	if (topicpart && buffers_buffer_available(topicbuffer) > 0) {
 		buffers_buffer_terminate(topicbuffer);
 		if (processor != NULL)
 			processor(topicbuffer, userdata);
 		buffers_buffer_reset(topicbuffer);
-	}
+	} else if (thisandabovewildcard)
+		if (wildcardprocessor != NULL)
+			wildcardprocessor(THISANDABOVE, userdata);
 
 	return consumed;
 }

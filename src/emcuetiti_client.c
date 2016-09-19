@@ -84,13 +84,14 @@ static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
 	if (client->keepalive != 0)
 		keepalive = client->keepalive;
 
-	emcuetiti_timestamp expires = client->lastseen + keepalive;
+	emcuetiti_timestamp expires = client->lastseen
+			+ (keepalive + (keepalive / 2));
 
 	if (expires > now) {
 		EMCUETITI_CONFIG_TIMESTAMPTYPE timebeforeexpiry = expires - now;
 #if EMCUETITI_CONFIG_DEBUG_KEEPALIVE
-		broker->callbacks->log(broker, "client %s expires in %ds", client->clientid,
-				timebeforeexpiry);
+		broker->callbacks->log(broker, "client %s expires in %ds",
+				client->clientid, timebeforeexpiry);
 #endif
 	} else {
 		broker->callbacks->log(broker, "client %s has expired",
@@ -318,25 +319,6 @@ void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 	}
 }
 
-int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* client, uint8_t* buffer, size_t len) {
-
-	/*emcuetiti_clientstate* cs;
-	 for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
-	 if (broker->clients[i].client == client) {
-	 cs = &(broker->clients[i]);
-	 }
-	 }
-
-	 len = size_min(len, cs->publishpayloadlen);
-
-	 memcpy(buffer, cs->buffer + cs->bufferpos, len);
-
-	 //cs->readstate = CLIENTREADSTATE_IDLE;*/
-
-	return 0;
-}
-
 static void processtopicpart(buffers_buffer* topicpart, void* userdata) {
 	emcuetiti_clientstate* cs = (emcuetiti_clientstate*) userdata;
 
@@ -365,15 +347,19 @@ static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
 		switch (cs->incomingpacket.state) {
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:
 			ret = emcuetiti_topic_munchtopicpart(buffer, len, &cidb,
-					processtopicpart, cs);
+					processtopicpart, NULL, cs);
 			break;
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {
 			if (cs->registers.publish.payloadbuff == NULL)
 				cs->registers.publish.payloadbuff =
 						emcuetiti_broker_getpayloadbuffer(cs->broker);
-			BUFFERS_STATICBUFFER_TO_BUFFER(cs->registers.publish.payloadbuff,
-					payloadbuff);
-			ret = buffers_buffer_append(&payloadbuff, buffer, len);
+
+			if (cs->registers.publish.payloadbuff != NULL) {
+				BUFFERS_STATICBUFFER_TO_BUFFER(
+						cs->registers.publish.payloadbuff, payloadbuff);
+				ret = buffers_buffer_append(&payloadbuff, buffer, len);
+			} else
+				ret = LIBMQTT_EWOULDBLOCK;
 			break;
 		}
 		}
@@ -381,7 +367,7 @@ static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
 	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
 	case LIBMQTT_PACKETTYPE_UNSUBSCRIBE: {
 		ret = emcuetiti_topic_munchtopicpart(buffer, len, &cidb,
-				processtopicpart, cs);
+				processtopicpart, NULL, cs);
 	}
 		break;
 	case LIBMQTT_PACKETTYPE_CONNECT: {
@@ -410,13 +396,17 @@ static int statechange(libmqtt_packetread* pkt,
 	}
 		break;
 	case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:
-		buffers_buffer_terminate(&clientbuffer);
-		processtopicpart(&clientbuffer, cs);
+		if (buffers_buffer_available(&clientbuffer) > 0) {
+			buffers_buffer_terminate(&clientbuffer);
+			processtopicpart(&clientbuffer, cs);
+		}
 		break;
 	case LIBMQTT_PACKETREADSTATE_SUBSCRIBE_QOS:
 	case LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICFILTER:
-		buffers_buffer_terminate(&clientbuffer);
-		processtopicpart(&clientbuffer, cs);
+		if (buffers_buffer_available(&clientbuffer) > 0) {
+			buffers_buffer_terminate(&clientbuffer);
+			processtopicpart(&clientbuffer, cs);
+		}
 		cs->registers.subunsub.pendingqos[cs->registers.subunsub.subscriptionspending] =
 				pkt->varhdr.subscribe.topicfilterqos;
 		cs->registers.subunsub.pendinglevels[cs->registers.subunsub.subscriptionspending] =
@@ -460,6 +450,8 @@ void emcuetiti_client_poll(emcuetiti_brokerhandle* broker,
 
 								memset(&cs->registers, 0,
 										sizeof(cs->registers));
+
+								cs->lastseen = now;
 							}
 						}
 						emcuetiti_broker_poll_checkkeepalive(broker, cs, now);

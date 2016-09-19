@@ -71,6 +71,7 @@ static int remote_write(void* connectiondata, const uint8_t* buffer, size_t len)
 static const emcuetiti_port_remote_hostops remotehostops = { //
 		.connect = remote_connect, //
 				.disconnect = remote_disconnect, //
+				.datawaiting = gsocket_readytoread, //
 				.read = gsocket_read, //
 				.write = remote_write };
 
@@ -87,18 +88,18 @@ int remote_init(emcuetiti_brokerhandle* broker) {
 		remoteconfig.port = commandline_remote_port;
 		remoteconfig.keepalive = commandline_remote_keepalive;
 
-		int numtopics = 0;
-		for (gchar** t = commandline_remote_topics; *t != NULL; t++)
-			numtopics++;
+		remoteconfig.numtopics = 0;
+		if (commandline_remote_topics != NULL) {
+			for (gchar** t = commandline_remote_topics; *t != NULL; t++)
+				remoteconfig.numtopics++;
+			remoteconfig.topics = g_malloc(
+					sizeof(libmqtt_subscription) * remoteconfig.numtopics);
 
-		remoteconfig.numtopics = numtopics;
-		remoteconfig.topics = g_malloc(
-				sizeof(libmqtt_subscription) * numtopics);
-
-		for (int i = 0; i < remoteconfig.numtopics; i++) {
-			libmqtt_subscription* sub = &remoteconfig.topics[i];
-			sub->topic = commandline_remote_topics[i];
-			sub->qos = LIBMQTT_QOS0_ATMOSTONCE;
+			for (int i = 0; i < remoteconfig.numtopics; i++) {
+				libmqtt_subscription* sub = &remoteconfig.topics[i];
+				sub->topic = commandline_remote_topics[i];
+				sub->qos = LIBMQTT_QOS0_ATMOSTONCE;
+			}
 		}
 
 		emcuetiti_port_remote_new(broker, &remoteconfig, &remoteport,

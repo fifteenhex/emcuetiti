@@ -56,4 +56,13 @@ public class ClientBasic extends BaseMQTTTest {
         }
     }
 
+    @Test
+    public void keepalive() {
+        try {
+            Thread.sleep((KEEPALIVE * 4) * 1000);
+        } catch (InterruptedException ie) {
+
+        }
+    }
+
 }

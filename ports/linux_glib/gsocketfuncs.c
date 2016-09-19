@@ -2,6 +2,11 @@
 #include "gsocketfuncs.h"
 #include "libmqtt.h"
 
+bool gsocket_readytoread(void* userdata) {
+	GSocket* socket = (GSocket*) userdata;
+	return g_socket_condition_check(socket, G_IO_IN) == G_IO_IN;
+}
+
 int gsocket_read(void* connectiondata, uint8_t* buffer, size_t len) {
 	GError* error = NULL;
 	GSocket* sock = (GSocket*) connectiondata;

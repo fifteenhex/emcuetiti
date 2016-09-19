@@ -12,6 +12,7 @@ import org.fusesource.mqtt.client.*;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class BaseMQTTTest {
 
@@ -25,6 +26,7 @@ public class BaseMQTTTest {
     protected static final String SUBTOPIC = "subtopic1";
     protected static final String TOPIC2 = "topic2";
     protected static final String FULLSUBTOPIC = TOPIC + "/" + SUBTOPIC;
+    protected static final short KEEPALIVE = 30;
 
     private static Process brokerProcess;
     protected static BlockingConnection[] mqttConnections = new BlockingConnection[MQTT_CLIENTS];
@@ -44,6 +46,7 @@ public class BaseMQTTTest {
             mqttClient.setConnectAttemptsMax(1);
             mqttClient.setReconnectAttemptsMax(0);
             mqttClient.setCleanSession(true);
+            mqttClient.setKeepAlive(KEEPALIVE);
         } catch (URISyntaxException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
@@ -131,6 +134,7 @@ public class BaseMQTTTest {
             assert (mqttConnections[c].isConnected());
         }
     }
+
 
     protected void subscribeToTopic(final BlockingConnection mqttConnection, final String topic) {
         try {

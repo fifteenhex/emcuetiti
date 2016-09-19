@@ -17,11 +17,6 @@ typedef struct {
 
 static brokerdata data;
 
-static bool readytoread(void* userdata) {
-	GSocket* socket = (GSocket*) userdata;
-	return g_socket_condition_check(socket, G_IO_IN) == G_IO_IN;
-}
-
 static int gsocket_write(void* userdata, const uint8_t* buffer, size_t len) {
 	GSocket* socket = (GSocket*) userdata;
 	int ret = g_socket_send(socket, buffer, len, NULL, NULL);
@@ -60,7 +55,7 @@ static const emcuetiti_brokerhandle_callbacks brokerops = { //
 				.log = broker_log, .writefunc = gsocket_write, //
 				.disconnectfunc = gsocket_disconnect, //
 				.isconnectedfunc = gsocket_isconnected, //
-				.readytoread = readytoread, //
+				.readytoread = gsocket_readytoread, //
 				.readfunc = gsocket_read };
 
 static gboolean brokerpoll(gpointer data) {
