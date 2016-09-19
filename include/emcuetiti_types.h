@@ -96,6 +96,7 @@ typedef struct {
 } emcuetiti_subscription;
 
 typedef struct {
+	emcuetiti_topichandle* topic;
 	uint8_t* payloadbuff;
 } clientregisters_publish;
 

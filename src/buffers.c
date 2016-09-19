@@ -49,6 +49,11 @@ int buffers_buffer_readfunc(void* userdata, uint8_t* buffer, size_t len) {
 	return readsz;
 }
 
+void buffers_buffer_resetfunc(void* userdata) {
+	buffers_buffer* target = (buffers_buffer*) userdata;
+	*target->tail = 0;
+}
+
 size_t buffers_buffer_free(buffers_buffer* buffer) {
 	return *buffer->size - *buffer->head;
 }
@@ -119,4 +124,11 @@ void buffers_buffer_unref(buffers_buffer* target) {
 	*target->refs = *target->refs--;
 	if (!buffers_buffer_inuse(target))
 		buffers_buffer_reset(target);
+}
+
+void buffers_buffer_createreference(buffers_buffer* buffer,
+		buffers_buffer_reference* reference) {
+	memcpy(&reference->buffer, buffer, sizeof(reference->buffer));
+	reference->localtail = *reference->buffer.tail;
+	reference->buffer.tail = &reference->localtail;
 }

@@ -105,10 +105,13 @@ static void emcuetiti_handleinboundpacket_publish(
 	BUFFERS_STATICBUFFER_TO_BUFFER(cs->registers.publish.payloadbuff,
 			payloadbuffer);
 
-	broker->callbacks->log(broker, "handling publish, have %d bytes",
-			buffers_buffer_available(&payloadbuffer));
+	if (cs->registers.publish.topic != NULL) {
+		broker->callbacks->log(broker, "handling publish, have %d bytes",
+				buffers_buffer_available(&payloadbuffer));
 
-	emcuetiti_port_onpublishready(broker, NULL, &payloadbuffer);
+		emcuetiti_port_onpublishready(broker, cs->registers.publish.topic,
+				&payloadbuffer);
+	}
 
 	buffers_buffer_unref(&payloadbuffer);
 
@@ -326,10 +329,16 @@ int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
 
 static void processtopicpart(buffers_buffer* topicpart, void* userdata) {
 	emcuetiti_clientstate* cs = (emcuetiti_clientstate*) userdata;
-	cs->registers.subunsub.pendingtopics[cs->registers.subunsub.subscriptionspending] =
-			emcuetiti_findtopic(cs->broker,
-					cs->registers.subunsub.pendingtopics[cs->registers.subunsub.subscriptionspending],
-					topicpart->buffer);
+
+	if (cs->incomingpacket.type == LIBMQTT_PACKETTYPE_PUBLISH) {
+		cs->registers.publish.topic = emcuetiti_findtopic(cs->broker,
+				cs->registers.publish.topic, topicpart->buffer);
+	} else {
+		cs->registers.subunsub.pendingtopics[cs->registers.subunsub.subscriptionspending] =
+				emcuetiti_findtopic(cs->broker,
+						cs->registers.subunsub.pendingtopics[cs->registers.subunsub.subscriptionspending],
+						topicpart->buffer);
+	}
 }
 
 static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
@@ -397,7 +406,7 @@ static int statechange(libmqtt_packetread* pkt,
 		cs->registers.subunsub.pendingqos[cs->registers.subunsub.subscriptionspending] =
 				pkt->varhdr.subscribe.topicfilterqos;
 		cs->registers.subunsub.pendinglevels[cs->registers.subunsub.subscriptionspending] =
-				ONLYTHIS;
+				THISANDABOVE;
 		cs->registers.subunsub.subscriptionspending++;
 		break;
 	}

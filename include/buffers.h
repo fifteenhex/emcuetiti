@@ -17,9 +17,6 @@ int buffers_buffer_append(buffers_buffer* target, const uint8_t* buffer,
 		size_t len);
 int buffers_buffer_emptyinto(buffers_buffer* src, uint8_t* dst, size_t max);
 
-int buffers_buffer_writefunc(void* userdata, const uint8_t* buffer, size_t len);
-int buffers_buffer_readfunc(void* userdata, uint8_t* buffer, size_t len);
-
 size_t buffers_buffer_free(buffers_buffer* buffer);
 size_t buffers_buffer_available(buffers_buffer* buffer);
 void buffers_buffer_reset(buffers_buffer* buffer);
@@ -31,7 +28,13 @@ int buffers_buffer_fill(buffers_buffer* buffer, size_t waiting,
 void buffers_buffer_terminate(buffers_buffer* target);
 
 //
+int buffers_buffer_writefunc(void* userdata, const uint8_t* buffer, size_t len);
+int buffers_buffer_readfunc(void* userdata, uint8_t* buffer, size_t len);
+void buffers_buffer_resetfunc(void* userdata);
 
+//
 bool buffers_buffer_inuse(buffers_buffer* target);
 void buffers_buffer_ref(buffers_buffer* target);
 void buffers_buffer_unref(buffers_buffer* target);
+void buffers_buffer_createreference(buffers_buffer* buffer,
+		buffers_buffer_reference* reference);

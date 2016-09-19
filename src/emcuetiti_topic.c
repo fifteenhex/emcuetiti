@@ -150,10 +150,18 @@ int emcuetiti_topic_munchtopicpart(const uint8_t* buffer, size_t len,
 	size_t consumed;
 	bool partcomplete = false;
 	for (consumed = 0; consumed < len; consumed++) {
-		if (buffer[consumed] == '/') {
+		bool exit = false;
+		switch (buffer[consumed]) {
+		case '/':
 			partcomplete = true;
+			exit = true;
+			break;
+		case '#':
+			exit = true;
 			break;
 		}
+		if (exit)
+			break;
 	}
 
 	buffers_buffer_append(topicbuffer, buffer, consumed);

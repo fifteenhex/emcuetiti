@@ -91,9 +91,6 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 	}
 
 	broker->callbacks->log(broker, "finished");
-
-//if (publish->freefunc != NULL)
-//	publish->freefunc(publish->userdata);
 }
 
 void emcuetiti_broker_init(emcuetiti_brokerhandle* broker) {

@@ -4,31 +4,25 @@
 #include "emcuetiti_port_router.h"
 #include "emcuetiti_client.h"
 #include "emcuetiti_broker.h"
+#include "buffers.h"
 
 static int emcuetiti_port_publishreadycallback(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* topic, buffers_buffer* buffer) {
 
 	broker->callbacks->log(broker, "publish ready");
 
-	/*
+	buffers_buffer_reference bufferreference;
+	buffers_buffer_createreference(buffer, &bufferreference);
 
-	 uint8_t* buffer = g_malloc(publishlen + 1);
-	 int read = emcuetiti_client_readpublish(broker, client, buffer, publishlen);
-	 buffer[read] = '\0';
-	 printf("publish %s\n", (char *) buffer);
+	emcuetiti_publish pub = { .topic = topic, //
+			.readfunc = buffers_buffer_readfunc, //
+			.resetfunc = buffers_buffer_resetfunc, //
+			.userdata = &bufferreference, //
+			.payloadln = buffers_buffer_available(buffer) };
 
-	 emcuetiti_bufferholder bh = { .buffer = buffer, .len = publishlen,
-	 .readpos = 0 };
+	emcuetiti_broker_publish(broker, &pub);
 
-	 emcuetiti_publish pub = { .topic = topic, //
-	 .readfunc = emcuetiti_router_readfunc, //
-	 .resetfunc = emcuetiti_router_resetfunc, //
-	 .userdata = &bh, //
-	 .payloadln = publishlen };
-
-	 emcuetiti_broker_publish(broker, &pub);
-
-	 g_free(buffer);*/
+	buffers_buffer_unref(&bufferreference.buffer);
 
 	return 0;
 }
