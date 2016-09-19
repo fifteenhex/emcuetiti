@@ -32,16 +32,20 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 	emcuetiti_broker_dumpstate_printtopic(broker, publish->topic);
 
 	for (int c = 0; c < ARRAY_ELEMENTS(broker->clients); c++) {
-
 		emcuetiti_clientstate* cs = &broker->clients[c];
-
 		if (cs->state == CLIENTSTATE_CONNECTED) {
-
+			broker->callbacks->log(broker,
+					"checking client %s, has %d subscriptions", cs->clientid,
+					cs->numsubscriptions);
 			bool subbed = false;
 			for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
 				emcuetiti_subscription* sub = &(cs->subscriptions[i]);
 				emcuetiti_topichandle* topic = sub->topic;
 				if (topic != NULL) {
+
+					broker->callbacks->log(broker, "topic %s",
+							topic->topicpart);
+
 					if (topic == publish->topic) {
 						subbed = true;
 					} else if (sub->level == THISANDABOVE) {

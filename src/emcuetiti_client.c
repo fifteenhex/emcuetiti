@@ -160,19 +160,25 @@ static void emcuetiti_handleinboundpacket_subscribe(
 
 	for (int i = 0; i < num; i++) {
 		returncodes[i] = LIBMQTT_SUBSCRIBERETURNCODE_FAILURE;
-		if (cs->numsubscriptions < EMCUETITI_CONFIG_MAXSUBSPERCLIENT) {
-			for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
-				if (cs->subscriptions[i].topic == NULL) {
-					cs->subscriptions[i].topic =
-							cs->registers.subunsub.pendingtopics[i];
-					cs->subscriptions[i].qos =
-							cs->registers.subunsub.pendingqos[i];
-					cs->subscriptions[i].level =
-							cs->registers.subunsub.pendinglevels[i];
+		emcuetiti_topichandle* topic = cs->registers.subunsub.pendingtopics[i];
+		if (topic != NULL) {
+			if (cs->numsubscriptions < EMCUETITI_CONFIG_MAXSUBSPERCLIENT) {
+				for (int j = 0; j < ARRAY_ELEMENTS(cs->subscriptions); j++) {
+					if (cs->subscriptions[j].topic == NULL) {
+						cs->subscriptions[j].topic = topic;
+						cs->subscriptions[j].qos =
+								cs->registers.subunsub.pendingqos[i];
+						cs->subscriptions[j].level =
+								cs->registers.subunsub.pendinglevels[i];
+						cs->numsubscriptions++;
+						returncodes[i] = 0;
+						broker->callbacks->log(broker,
+								"inserted subscription into %s, now have %d",
+								cs->clientid, cs->numsubscriptions);
+						break;
+					}
 				}
 			}
-			cs->numsubscriptions++;
-			returncodes[i] = 0;
 		}
 	}
 
@@ -194,7 +200,9 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 					== cs->registers.subunsub.pendingtopics[i]) {
 				cs->subscriptions[j].topic = NULL;
 				cs->numsubscriptions--;
-				cs->broker->callbacks->log(broker, "cleared subscription");
+				cs->broker->callbacks->log(broker,
+						"cleared subscription from %s, now have %d",
+						cs->clientid, cs->numsubscriptions);
 				break;
 			}
 		}
