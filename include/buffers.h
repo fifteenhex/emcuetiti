@@ -2,12 +2,15 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "libmqtt.h"
 
-#define BUFFERS_STATICBUFFER_TO_BUFFER(s, b) buffers_buffer b; buffers_staticbuffer_tobuffer(s, sizeof(s), &b)
+#define BUFFERS_STATICBUFFER_TO_BUFFER(s, b) size_t b##_size = sizeof(s);\
+	buffers_buffer b; \
+	buffers_staticbuffer_tobuffer(s, &b##_size, &b)
 
-void buffers_staticbuffer_tobuffer(uint8_t* staticbuffer, size_t sz,
+void buffers_staticbuffer_tobuffer(uint8_t* staticbuffer, size_t* sz,
 		buffers_buffer* buffer);
 
 int buffers_buffer_append(buffers_buffer* target, const uint8_t* buffer,
@@ -27,4 +30,8 @@ int buffers_buffer_fill(buffers_buffer* buffer, size_t waiting,
 		libmqtt_readfunc readfunc, void* userdata);
 void buffers_buffer_terminate(buffers_buffer* target);
 
+//
+
+bool buffers_buffer_inuse(buffers_buffer* target);
+void buffers_buffer_ref(buffers_buffer* target);
 void buffers_buffer_unref(buffers_buffer* target);

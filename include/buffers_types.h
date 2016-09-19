@@ -9,8 +9,10 @@ typedef struct {
 } buffers_bufferhead;
 
 typedef struct {
-	buffers_bufferhead* head;
-	size_t sz;
+	size_t* size;
+	size_t* head;
+	size_t* tail;
+	unsigned* refs;
 	uint8_t* buffer;
 } buffers_buffer;
 

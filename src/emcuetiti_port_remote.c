@@ -20,10 +20,11 @@ static void emcuetiti_port_remote_movetostate(
 	printf("s:%d\n", newstate);
 }
 
-static void processtopicpart(buffers_buffer* topicbuffer,
-		emcuetiti_port_remote_portdata* data) {
+static void processtopicpart(buffers_buffer* topicbuffer, void* data) {
+	emcuetiti_port_remote_portdata* portdata =
+			(emcuetiti_port_remote_portdata*) data;
 	printf("toppart: %s\n", topicbuffer->buffer);
-	data->topic = emcuetiti_findtopic(data->broker, data->topic,
+	portdata->topic = emcuetiti_findtopic(portdata->broker, portdata->topic,
 			topicbuffer->buffer);
 }
 
@@ -79,7 +80,7 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
 		break;
 	case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD:
 		printf("pl:%u\n", pkt->length - pkt->pos);
-		processtopicpart(portdata, &topbuff);
+		processtopicpart(&topbuff, portdata);
 		break;
 	case LIBMQTT_PACKETREADSTATE_FINISHED:
 		if (pkt->type == LIBMQTT_PACKETTYPE_PUBLISH)

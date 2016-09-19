@@ -135,8 +135,8 @@ uint8_t* emcuetiti_broker_getpayloadbuffer(emcuetiti_brokerhandle* broker) {
 	for (int i = 0; i < EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS; i++) {
 		uint8_t* bufferaddress = &broker->inflightpayloads[i];
 		BUFFERS_STATICBUFFER_TO_BUFFER(bufferaddress, payloadbuffer);
-		if (payloadbuffer.head->refs == 0) {
-			payloadbuffer.head->refs = 1;
+		if (!buffers_buffer_inuse(&payloadbuffer)) {
+			buffers_buffer_ref(&payloadbuffer);
 			return bufferaddress;
 		}
 	}

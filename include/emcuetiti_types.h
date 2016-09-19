@@ -37,7 +37,7 @@ typedef void (*emcuetiti_disconnectfunc)(emcuetiti_brokerhandle* broker,
 
 typedef emcuetiti_timestamp (*emcuetiti_timstampfunc)(void);
 
-typedef void (*emcuetiti_logfunc)(emcuetiti_brokerhandle* broker,
+typedef void (*emcuetiti_logfunc)(const emcuetiti_brokerhandle* broker,
 		const char* msg, ...);
 
 // shared structures
