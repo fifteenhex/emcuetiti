@@ -4,10 +4,12 @@
 #include "emcuetiti_config.h"
 #include "emcuetiti_topic.h"
 
+#include "buffers.h"
+
 emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, const char* topicpart) {
 
-	printf("looking for %s\n", topicpart);
+	broker->callbacks->log(broker, "looking for %s", topicpart);
 	if (root == NULL)
 		root = broker->root;
 	else
@@ -15,10 +17,10 @@ emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
 
 	for (; root != NULL; root = root->sibling) {
 		if (strcmp(root->topicpart, topicpart) == 0) {
-			printf("found %s\n", topicpart);
+			broker->callbacks->log(broker, "found %s", topicpart);
 			return root;
 		} else
-			printf("not %s\n", root->topicpart);
+			broker->callbacks->log(broker, "not %s", root->topicpart);
 	}
 
 	return NULL;
@@ -139,4 +141,28 @@ emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 		*level = sublevel;
 
 	return t;
+}
+
+int emcuetiti_topic_munchtopicpart(const uint8_t* buffer, size_t len,
+		buffers_buffer* topicbuffer, emcuetiti_topicpartprocessor processor,
+		void* userdata) {
+
+	size_t consumed;
+	bool partcomplete = false;
+	for (consumed = 0; consumed < len; consumed++) {
+		if (buffer[consumed] == '/') {
+			partcomplete = true;
+			break;
+		}
+	}
+
+	buffers_buffer_append(topicbuffer, buffer, consumed);
+	if (partcomplete && buffers_buffer_available(topicbuffer) > 0) {
+		buffers_buffer_terminate(topicbuffer);
+		if (processor != NULL)
+			processor(topicbuffer, userdata);
+		buffers_buffer_reset(topicbuffer);
+	}
+
+	return consumed;
 }

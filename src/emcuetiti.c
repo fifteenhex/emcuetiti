@@ -5,6 +5,7 @@
 
 #include "emcuetiti_priv.h"
 #include "emcuetiti.h"
+#include "buffers.h"
 
 #include "util.h"
 
@@ -128,4 +129,16 @@ void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker) {
 
 bool emcuetiti_broker_canacceptmoreclients(emcuetiti_brokerhandle* broker) {
 	return broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS;
+}
+
+uint8_t* emcuetiti_broker_getpayloadbuffer(emcuetiti_brokerhandle* broker) {
+	for (int i = 0; i < EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS; i++) {
+		uint8_t* bufferaddress = &broker->inflightpayloads[i];
+		BUFFERS_STATICBUFFER_TO_BUFFER(bufferaddress, payloadbuffer);
+		if (payloadbuffer.head->refs == 0) {
+			payloadbuffer.head->refs = 1;
+			return bufferaddress;
+		}
+	}
+	return NULL;
 }

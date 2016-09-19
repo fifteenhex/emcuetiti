@@ -132,6 +132,11 @@ typedef struct {
 
 typedef struct {
 	uint16_t msgid;
+	uint16_t topicfilterlen;
+} libmqtt_packet_unsubscribe;
+
+typedef struct {
+	uint16_t msgid;
 	uint16_t topiclen;
 } libmqtt_packet_publish;
 
@@ -141,6 +146,7 @@ typedef union {
 	libmqtt_packet_connack connack;
 	libmqtt_packet_publish publish;
 	libmqtt_packet_subscribe subscribe;
+	libmqtt_packet_unsubscribe unsubscribe;
 } libmqtt_packetread_registers;
 
 typedef struct {

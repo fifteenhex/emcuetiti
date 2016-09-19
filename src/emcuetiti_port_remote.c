@@ -8,8 +8,7 @@
 #define TIMEOUT 30
 
 static int emcuetiti_port_remote_publishready(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* client, emcuetiti_topichandle* topic,
-		size_t payloadlen) {
+		emcuetiti_topichandle* topic, buffers_buffer* buffer) {
 	return 0;
 }
 
@@ -21,36 +20,11 @@ static void emcuetiti_port_remote_movetostate(
 	printf("s:%d\n", newstate);
 }
 
-static void processtopicpart(emcuetiti_port_remote_portdata* data,
-		buffers_buffer* topicbuffer) {
-	uint8_t term = '\0';
-	buffers_buffer_append(topicbuffer, &term, 1);
+static void processtopicpart(buffers_buffer* topicbuffer,
+		emcuetiti_port_remote_portdata* data) {
 	printf("toppart: %s\n", topicbuffer->buffer);
-
 	data->topic = emcuetiti_findtopic(data->broker, data->topic,
 			topicbuffer->buffer);
-
-	buffers_buffer_reset(topicbuffer);
-}
-
-static int emcuetiti_port_remote_munchtopicpart(
-		emcuetiti_port_remote_portdata* portdata, const uint8_t* buffer,
-		size_t len, buffers_buffer* topicbuffer) {
-
-	size_t consumed;
-	bool partcomplete = false;
-	for (consumed = 0; consumed < len; consumed++) {
-		if (buffer[consumed] == '/') {
-			partcomplete = true;
-			break;
-		}
-	}
-
-	buffers_buffer_append(topicbuffer, buffer, consumed);
-	if (partcomplete && buffers_buffer_available(topicbuffer) > 0)
-		processtopicpart(portdata, topicbuffer);
-
-	return consumed;
 }
 
 static int emcuetiti_port_remote_readpacket_writer(void* userdata,
@@ -64,8 +38,8 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 		switch (portdata->statedata.ready.pktread.state) {
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC: {
 			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuf);
-			ret = emcuetiti_port_remote_munchtopicpart(portdata, buffer, len,
-					&topbuf);
+			ret = emcuetiti_topic_munchtopicpart(buffer, len, &topbuf,
+					processtopicpart, portdata);
 		}
 			break;
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {

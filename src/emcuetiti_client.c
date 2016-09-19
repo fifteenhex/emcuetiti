@@ -5,6 +5,8 @@
 #include "emcuetiti_topic.h"
 #include "emcuetiti_client.h"
 #include "emcuetiti_error.h"
+#include "emcuetiti_port.h"
+#include "emcuetiti_broker.h"
 
 #include "buffers.h"
 #include "libmqtt_priv.h"
@@ -100,39 +102,17 @@ static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
 static void emcuetiti_handleinboundpacket_publish(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 
-	broker->callbacks->log(broker, "handling publish");
+	BUFFERS_STATICBUFFER_TO_BUFFER(cs->registers.publish.payloadbuff,
+			payloadbuffer);
 
-	/*
-	 libmqtt_qos qos = (flags >> 1) & 0x3;
-	 uint16_t messageid;
+	broker->callbacks->log(broker, "handling publish, have %d bytes",
+			buffers_buffer_available(&payloadbuffer));
 
-	 uint16_t topiclen;
-	 emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
-	 cs->buffer, &topiclen, NULL);
+	emcuetiti_port_onpublishready(broker, NULL, &payloadbuffer);
 
-	 if (t != NULL) {
-	 cs->publishtopic = t;
-	 cs->publishpayloadlen = cs->varheaderandpayloadlen - (topiclen + 2);
-	 //cs->readstate = CLIENTREADSTATE_PUBLISHREADY;
-	 cs->bufferpos = topiclen + 2;
+	buffers_buffer_unref(&payloadbuffer);
 
-	 if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
-	 messageid = (cs->buffer[cs->bufferpos] << 8)
-	 | cs->buffer[cs->bufferpos + 1];
-	 cs->bufferpos += 2;
-	 }
-
-	 for (int p = 0; p < ARRAY_ELEMENTS(broker->ports); p++) {
-	 if (broker->ports[p] != NULL) {
-	 broker->callbacks->log(broker, "dispatching publish to port %d",
-	 p);
-	 if (broker->ports[p]->publishreadycallback != NULL)
-	 broker->ports[p]->publishreadycallback(broker, cs->client,
-	 t, cs->publishpayloadlen);
-	 }
-	 }
-
-	 if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
+	/*if (qos > LIBMQTT_QOS0_ATMOSTONCE) {
 	 libmqtt_construct_puback(
 	 emcuetiti_client_resolvewritefunc(broker, cs),
 	 cs->client->userdata, messageid);
@@ -160,101 +140,65 @@ static void emcuetiti_handleinboardpacket_connect(
 				userdata);
 	}
 	cs->state = CLIENTSTATE_CONNECTED;
-	//cs->readstate = CLIENTREADSTATE_IDLE;
 }
 
 static void emcuetiti_handleinboundpacket_subscribe(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	void* userdata = cs->client->userdata;
-	uint8_t returncodes[] = { LIBMQTT_SUBSCRIBERETURNCODE_FAILURE };
+
+	uint8_t returncodes[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
 
 	uint16_t messageid = cs->incomingpacket.varhdr.msgid;
+	uint16_t num = cs->registers.subunsub.subscriptionspending;
 
-	/*
-	 uint8_t* buffer = cs->buffer;
-	 uint8_t* bufferend = cs->buffer + cs->varheaderandpayloadlen;
+	broker->callbacks->log(broker,
+			"processing %d subscriptions from message %d for %s", num,
+			(int) messageid, cs->clientid);
 
-	 uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
-
-	 uint16_t topiclen;
-	 emcuetiti_subscription_level level;
-
-	 emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
-	 buffer, &topiclen, &level);
-	 buffer += 2 + topiclen;
-	 uint8_t qos = *(buffer++);
-
-	 if (buffer != bufferend)
-	 broker->callbacks->log(broker, "probably have more topics");
-
-	 broker->callbacks->log(broker, "sub from %s, messageid %d, qos %d",
-	 cs->clientid, (int) messageid, (int) qos);
-
-	 bool qosisvalid = qos >= LIBMQTT_QOS0_ATMOSTONCE
-	 && qos <= LIBMQTT_QOS2_EXACTLYONCE;
-	 if (!qosisvalid)
-	 broker->callbacks->log(broker,
-	 "client %s requested invalid qos in subreq", cs->clientid);
-
-	 if (qosisvalid && t != NULL) {
-	 bool added = false;
-	 for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
-	 if (cs->subscriptions[i].topic == NULL) {
-	 cs->subscriptions[i].topic = t;
-	 cs->subscriptions[i].qos = qos;
-	 cs->subscriptions[i].level = level;
-	 cs->numsubscriptions++;
-	 returncodes[0] = 0;
-	 break;
-	 }
-	 }
-	 }*/
+	for (int i = 0; i < num; i++) {
+		returncodes[i] = LIBMQTT_SUBSCRIBERETURNCODE_FAILURE;
+		if (cs->numsubscriptions < EMCUETITI_CONFIG_MAXSUBSPERCLIENT) {
+			for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
+				if (cs->subscriptions[i].topic == NULL) {
+					cs->subscriptions[i].topic =
+							cs->registers.subunsub.pendingtopics[i];
+					cs->subscriptions[i].qos =
+							cs->registers.subunsub.pendingqos[i];
+					cs->subscriptions[i].level =
+							cs->registers.subunsub.pendinglevels[i];
+				}
+			}
+			cs->numsubscriptions++;
+			returncodes[i] = 0;
+		}
+	}
 
 	libmqtt_construct_suback(emcuetiti_client_resolvewritefunc(broker, cs),
-			userdata, messageid, returncodes, 1);
+			userdata, messageid, returncodes, num);
 }
 
 static void emcuetiti_handleinboundpacket_unsubscribe(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	void* userdata = cs->client->userdata;
-
 	uint16_t messageid = cs->incomingpacket.varhdr.msgid;
-	/*
-	 uint8_t* buffer = cs->buffer;
-	 uint8_t* bufferend = cs->buffer + cs->varheaderandpayloadlen;
 
-	 uint16_t messageid = (*(buffer++) << 8) | *(buffer++);
+	broker->callbacks->log(broker, "handling %d unsubscriptions",
+			cs->registers.subunsub.subscriptionspending);
 
-	 uint16_t topiclen;
-	 emcuetiti_subscription_level level;
-
-	 emcuetiti_topichandle* t = emcuetiti_readtopicstringandfindtopic(broker,
-	 buffer, &topiclen, &level);
-	 buffer += 2 + topiclen;
-
-	 if (buffer != bufferend)
-	 broker->callbacks->log(broker, "probably more topics");
-
-	 broker->callbacks->log(broker, "unsub from %s, messageid %d", cs->clientid,
-	 (int) messageid);
-
-	 if (t == NULL) {
-	 broker->callbacks->log(broker,
-	 "client tried to unsub from nonexisting topic");
-	 } else {
-
-	 for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
-	 if (cs->subscriptions[i].topic == t) {
-	 cs->subscriptions[i].topic = NULL;
-	 cs->numsubscriptions--;
-	 break;
-	 }
-	 }
-	 }*/
+	for (int i = 0; i < cs->registers.subunsub.subscriptionspending; i++) {
+		for (int j = 0; j < ARRAY_ELEMENTS(cs->subscriptions); j++) {
+			if (cs->subscriptions[j].topic
+					== cs->registers.subunsub.pendingtopics[i]) {
+				cs->subscriptions[j].topic = NULL;
+				cs->numsubscriptions--;
+				cs->broker->callbacks->log(broker, "cleared subscription");
+				break;
+			}
+		}
+	}
 
 	libmqtt_construct_unsuback(emcuetiti_client_resolvewritefunc(broker, cs),
 			userdata, messageid);
-
 }
 
 static void emcuetiti_handleinboundpacket_disconnect(
@@ -320,6 +264,9 @@ int emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 
 				memset(cs->subscriptions, 0, sizeof(cs->subscriptions));
 				cs->numsubscriptions = 0;
+				memset(&cs->registers, 0, sizeof(cs->registers));
+
+				cs->broker = broker;
 
 				broker->registeredclients++;
 				broker->callbacks->log(broker,
@@ -377,6 +324,14 @@ int emcuetiti_client_readpublish(emcuetiti_brokerhandle* broker,
 	return 0;
 }
 
+static void processtopicpart(buffers_buffer* topicpart, void* userdata) {
+	emcuetiti_clientstate* cs = (emcuetiti_clientstate*) userdata;
+	cs->registers.subunsub.pendingtopics[cs->registers.subunsub.subscriptionspending] =
+			emcuetiti_findtopic(cs->broker,
+					cs->registers.subunsub.pendingtopics[cs->registers.subunsub.subscriptionspending],
+					topicpart->buffer);
+}
+
 static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
 		size_t len) {
 
@@ -384,17 +339,33 @@ static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
 
 	int ret = len;
 
+	BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, cidb);
+
 	switch (cs->incomingpacket.type) {
 	case LIBMQTT_PACKETTYPE_PUBLISH:
 		switch (cs->incomingpacket.state) {
-		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD:
-			printf("wr: %c[%02x]\n", buffer[0], buffer[0]);
-			ret = 1;
+		case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:
+			ret = emcuetiti_topic_munchtopicpart(buffer, len, &cidb,
+					processtopicpart, cs);
+			break;
+		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {
+			if (cs->registers.publish.payloadbuff == NULL)
+				cs->registers.publish.payloadbuff =
+						emcuetiti_broker_getpayloadbuffer(cs->broker);
+			BUFFERS_STATICBUFFER_TO_BUFFER(cs->registers.publish.payloadbuff,
+					payloadbuff);
+			ret = buffers_buffer_append(&payloadbuff, buffer, len);
 			break;
 		}
+		}
+		break;
+	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
+	case LIBMQTT_PACKETTYPE_UNSUBSCRIBE: {
+		ret = emcuetiti_topic_munchtopicpart(buffer, len, &cidb,
+				processtopicpart, cs);
+	}
 		break;
 	case LIBMQTT_PACKETTYPE_CONNECT: {
-		BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, cidb);
 		ret = buffers_buffer_append(&cidb, buffer, len);
 	}
 		break;
@@ -408,15 +379,29 @@ static int statechange(libmqtt_packetread* pkt,
 
 	emcuetiti_clientstate* cs = (emcuetiti_clientstate*) userdata;
 
+	BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, clientbuffer);
+
 	switch (previousstate) {
 	case LIBMQTT_PACKETREADSTATE_CONNECT_CLIENTID: {
-		BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, clientbuffer);
+
 		size_t end = buffers_buffer_emptyinto(&clientbuffer, cs->clientid,
 				sizeof(cs->clientid) - 1);
 		cs->clientid[end] = '\0';
+		buffers_buffer_reset(&clientbuffer);
 	}
 		break;
+	case LIBMQTT_PACKETREADSTATE_SUBSCRIBE_QOS:
+	case LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_TOPICFILTER:
+		buffers_buffer_terminate(&clientbuffer);
+		processtopicpart(&clientbuffer, cs);
+		cs->registers.subunsub.pendingqos[cs->registers.subunsub.subscriptionspending] =
+				pkt->varhdr.subscribe.topicfilterqos;
+		cs->registers.subunsub.pendinglevels[cs->registers.subunsub.subscriptionspending] =
+				ONLYTHIS;
+		cs->registers.subunsub.subscriptionspending++;
+		break;
 	}
+
 	return 0;
 }
 
@@ -446,6 +431,12 @@ void emcuetiti_client_poll(emcuetiti_brokerhandle* broker,
 							if (cs->incomingpacket.state
 									== LIBMQTT_PACKETREADSTATE_FINISHED) {
 								emcuetiti_handleinboundpacket(broker, cs);
+
+								BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, cb);
+								buffers_buffer_reset(&cb);
+
+								memset(&cs->registers, 0,
+										sizeof(cs->registers));
 							}
 						}
 						emcuetiti_broker_poll_checkkeepalive(broker, cs, now);

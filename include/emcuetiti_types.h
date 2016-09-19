@@ -18,8 +18,7 @@ typedef struct emcuetiti_topichandle emcuetiti_topichandle;
 // function prototypes
 
 typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_brokerhandle* broker,
-		emcuetiti_clienthandle* client, emcuetiti_topichandle* topic,
-		size_t payloadlen);
+		emcuetiti_topichandle* topic, buffers_buffer* buffer);
 typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
 typedef bool (*emcuetiti_isconnected)(void* userdata);
 
@@ -96,6 +95,22 @@ typedef struct {
 
 } emcuetiti_subscription;
 
+typedef struct {
+	uint8_t* payloadbuff;
+} clientregisters_publish;
+
+typedef struct {
+	unsigned subscriptionspending;
+	emcuetiti_topichandle* pendingtopics[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
+	uint8_t pendingqos[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
+	emcuetiti_subscription_level pendinglevels[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
+} clientregisters_subunsub;
+
+typedef union {
+	clientregisters_publish publish;
+	clientregisters_subunsub subunsub;
+} clientregisters;
+
 struct emcuetiti_clientstate {
 	emcuetiti_clienthandle* client;
 	char clientid[LIBMQTT_CLIENTID_MAXLENGTH + 1];
@@ -118,6 +133,9 @@ struct emcuetiti_clientstate {
 
 	emcuetiti_topichandle* publishtopic;
 	size_t publishpayloadlen;
+
+	clientregisters registers;
+	emcuetiti_brokerhandle* broker;
 };
 // port structures
 
@@ -137,13 +155,6 @@ typedef struct {
 	void* userdata;
 	size_t payloadln;
 } emcuetiti_publish;
-
-typedef struct {
-	uint8_t* buffer;
-	size_t len;
-	size_t writepos;
-	size_t readpos;
-} emcuetiti_bufferholder;
 
 typedef struct {
 
@@ -166,6 +177,7 @@ struct emcuetiti_brokerhandle {
 	emcuetiti_topichandle* root;
 	emcuetiti_porthandle* ports[EMCUETITI_CONFIG_MAXPORTS];
 	emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
+	BUFFERS_STATICBUFFERPOOL(inflightpayloads, EMCUETITI_CONFIG_MAXPAYLOADLEN, EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS);
 	const emcuetiti_brokerhandle_callbacks* callbacks;
 	void* userdata;
 };

@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 
 public class ClientBasic extends BaseMQTTTest {
 
-
     @Test
     public void subscribeAndUnsubscribe() {
         BlockingConnection mqttConnection = mqttConnections[0];
@@ -40,7 +39,6 @@ public class ClientBasic extends BaseMQTTTest {
             unsubFromTopic(listener, TOPIC + "/#");
         }
     }
-
 
     @Test
     public void publish() {

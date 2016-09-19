@@ -4,6 +4,18 @@
 #include "emcuetiti_priv.h"
 #include "util.h"
 
+void emcuetiti_port_onpublishready(emcuetiti_brokerhandle* broker,
+		emcuetiti_topichandle* topic, buffers_buffer* payload) {
+	for (int p = 0; p < ARRAY_ELEMENTS(broker->ports); p++) {
+		if (broker->ports[p] != NULL) {
+			broker->callbacks->log(broker, "dispatching publish to port %d", p);
+			/*if (broker->ports[p]->publishreadycallback != NULL)
+			 broker->ports[p]->publishreadycallback(broker, cs->client, t,
+			 cs->publishpayloadlen);*/
+		}
+	}
+}
+
 void emcuetiti_port_poll(emcuetiti_brokerhandle* broker,
 		emcuetiti_timestamp now) {
 	for (int i = 0; i < ARRAY_ELEMENTS(broker->ports); i++) {

@@ -96,3 +96,18 @@ int buffers_buffer_emptyinto(buffers_buffer* src, uint8_t* dst, size_t max) {
 	memcpy(dst, src->buffer, cpysz);
 	return cpysz;
 }
+
+void buffers_buffer_terminate(buffers_buffer* target) {
+	uint8_t term = '\0';
+	buffers_buffer_append(target, &term, 1);
+}
+
+void buffer_buffer_ref(buffers_buffer* target) {
+
+}
+
+void buffers_buffer_unref(buffers_buffer* target) {
+	target->head->refs--;
+	if (target->head->refs == 0)
+		buffers_buffer_reset(target);
+}

@@ -25,3 +25,6 @@ int buffers_buffer_flush(buffers_buffer* buffer, libmqtt_writefunc writefunc,
 		void* userdata);
 int buffers_buffer_fill(buffers_buffer* buffer, size_t waiting,
 		libmqtt_readfunc readfunc, void* userdata);
+void buffers_buffer_terminate(buffers_buffer* target);
+
+void buffers_buffer_unref(buffers_buffer* target);

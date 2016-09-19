@@ -135,7 +135,9 @@ public class BaseMQTTTest {
     protected void subscribeToTopic(final BlockingConnection mqttConnection, final String topic) {
         try {
             Topic[] topics = new Topic[]{new Topic(topic, QoS.AT_LEAST_ONCE)};
-            mqttConnection.subscribe(topics);
+            byte[] results = mqttConnection.subscribe(topics);
+            int result = Byte.toUnsignedInt(results[0]);
+            assert result != 0x80 : "subscibe failed";
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -156,7 +158,13 @@ public class BaseMQTTTest {
                 Topic t = new Topic(topic[i], QoS.AT_LEAST_ONCE);
                 topics[i] = t;
             }
-            mqttConnection.subscribe(topics);
+            byte[] result = mqttConnection.subscribe(topics);
+            assert result.length == topics.length : "wanted " + topics.length + " results, have " + result.length;
+            for (byte r : result) {
+                int rv = Byte.toUnsignedInt(r);
+                assert rv != 0x80 : "got failed return code";
+            }
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
