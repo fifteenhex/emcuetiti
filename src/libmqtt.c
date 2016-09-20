@@ -790,8 +790,8 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 		memset(pkt, 0, sizeof(*pkt));
 
 	while (pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED && ret >= 0) {
-		//printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
-		//		pkt->pos);
+		printf("s %d - %d %d %d\n", pkt->state, pkt->type, pkt->length,
+				pkt->pos);
 
 		if (pkt->state < LIBMQTT_PACKETREADSTATE_COMMON_END)
 			ret = libmqtt_readpkt_commonstates(pkt, changefunc, changeuserdata,

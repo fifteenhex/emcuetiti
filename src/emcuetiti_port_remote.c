@@ -77,8 +77,14 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 		}
 			break;
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {
-			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
-			ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
+			if (portdata->publish == NULL)
+				portdata->publish = emcuetiti_broker_getpayloadbuffer(
+						portdata->broker);
+			if (portdata->publish != NULL) {
+				BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publish, pubbuff);
+				ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
+			} else
+				ret = LIBMQTT_EWOULDBLOCK;
 		}
 			break;
 		}
@@ -106,8 +112,6 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
 		// reset everything
 		buffers_buffer_reset(&topbuff);
 		portdata->topic = NULL;
-		BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publishbuffer, pubbuff);
-		buffers_buffer_reset(&pubbuff);
 	}
 		break;
 	case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:
@@ -271,7 +275,7 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 
 		if (data->publishwaiting) {
 
-			BUFFERS_STATICBUFFER_TO_BUFFER(data->publishbuffer, pb);
+			BUFFERS_STATICBUFFER_TO_BUFFER(data->publish, pb);
 
 			emcuetiti_publish pub = { .topic = data->topic,
 			/*emcuetiti_writefunc writefunc;*/
@@ -284,7 +288,10 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 
 			emcuetiti_broker_publish(data->broker, &pub);
 
+			buffers_buffer_unref(&pub);
+
 			data->publishwaiting = false;
+			data->publish = NULL;
 		}
 
 		break;
@@ -354,6 +361,7 @@ void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,
 	portdata->broker = broker;
 	portdata->config = config;
 	portdata->msgid = 0;
+	portdata->publish = NULL;
 	emcuetiti_port_remote_movetostate(portdata, REMOTEPORTSTATE_NOTCONNECTED);
 	port->portdata = portdata;
 

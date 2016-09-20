@@ -151,7 +151,7 @@ public class Remote extends BaseMQTTTest {
         getBoolFuture(emcuetitiConnected);
         getBoolFuture(emcuetitiSubbed);
 
-        String payload = "toremote";
+        /*String payload = "toremote";
         byte[] payloadbytes = payload.getBytes();
         try {
             localClient.publish(TOPICLOCALTOREMOTE, payloadbytes, QoS.AT_MOST_ONCE, false);
@@ -166,7 +166,7 @@ public class Remote extends BaseMQTTTest {
             assert payloadIn.equals(payload) : "wanted [" + payload + "] got [" + payloadIn + "]";
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
+        }*/
 
         try {
             Thread.sleep((60 * 1000));

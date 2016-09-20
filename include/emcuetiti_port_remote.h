@@ -101,7 +101,7 @@ typedef struct {
 // incoming publish tracking
 	BUFFERS_STATICBUFFER(topicbuffer, EMCUETITI_CONFIG_MAXTOPICPARTLEN);
 	emcuetiti_topichandle* topic;
-	BUFFERS_STATICBUFFER(publishbuffer, EMCUETITI_CONFIG_MAXPAYLOADLEN);
+	uint8_t* publish;
 	bool publishwaiting;
 } emcuetiti_port_remote_portdata;
 
