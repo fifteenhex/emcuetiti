@@ -125,6 +125,7 @@ public class Remote extends BaseMQTTTest {
         getBoolFuture(emcuetitiConnected);
         getBoolFuture(emcuetitiSubbed);
 
+
         String payload = "fromremote";
         try {
             remoteClient.publish(TOPICREMOTETOLOCAL, payload.getBytes(), QoS.AT_MOST_ONCE, false);

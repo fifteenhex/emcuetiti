@@ -42,17 +42,14 @@ static uint32_t broker_timestamp() {
 }
 
 static void broker_log(const emcuetiti_brokerhandle* broker, const char* msg,
-		...) {
-	va_list formatargs;
-	va_start(formatargs, msg);
-	g_logv(NULL, G_LOG_LEVEL_MESSAGE, msg, formatargs);
-	va_end(formatargs);
+		va_list args) {
+	g_logv(NULL, G_LOG_LEVEL_MESSAGE, msg, args);
 }
 
 static const emcuetiti_brokerhandle_callbacks brokerops = { //
 		.authenticatecallback = NULL, //
 				.timestamp = broker_timestamp, //
-				.log = broker_log, .writefunc = gsocket_write, //
+				.logx = broker_log, .writefunc = gsocket_write, //
 				.disconnectfunc = gsocket_disconnect, //
 				.isconnectedfunc = gsocket_isconnected, //
 				.readytoread = gsocket_readytoread, //

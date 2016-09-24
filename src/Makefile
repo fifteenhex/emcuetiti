@@ -7,7 +7,8 @@ $(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_topic.o \
 $(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_port.o \
 $(OUTPUTDIR)/emcuetiti_client.o \
 $(OUTPUTDIR)/emcuetiti_port_router.o \
-$(OUTPUTDIR)/emcuetiti_port_remote.o 
+$(OUTPUTDIR)/emcuetiti_port_remote.o \
+$(OUTPUTDIR)/emcuetiti_log.o 
 	$(AR) cr $@ $^
 
 #$(OUTPUTDIR)/sparsepointerarray.o \
@@ -34,4 +35,7 @@ $(OUTPUTDIR)/emcuetiti_port_remote.o: emcuetiti_port_remote.c $(INCLUDEDIR)/emcu
 	$(CC) $(CFLAGS) -c $< -o $@
 	
 $(OUTPUTDIR)/emcuetiti_client.o: emcuetiti_client.c $(INCLUDEDIR)/emcuetiti_client.h
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+$(OUTPUTDIR)/emcuetiti_log.o: emcuetiti_log.c $(INCLUDEDIR)/emcuetiti_log.h
 	$(CC) $(CFLAGS) -c $< -o $@

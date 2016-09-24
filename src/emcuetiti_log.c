@@ -14,19 +14,14 @@
  * along with emcuetiti.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "emcuetiti_log.h"
 
-#include "emcuetiti_types.h"
-
-void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker);
-void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
-		emcuetiti_topichandle* root, emcuetiti_topichandle* part,
-		const char* topicpart, bool targetable);
-void emcuetiti_broker_init(emcuetiti_brokerhandle* broker);
-void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker);
-
-void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
-		emcuetiti_publish* publish);
-bool emcuetiti_broker_canacceptmoreclients(emcuetiti_brokerhandle* broker);
-uint8_t* emcuetiti_broker_getpayloadbuffer(emcuetiti_brokerhandle* broker,
-		size_t* size);
+void emcuetiti_log(const emcuetiti_brokerhandle* broker,
+		emcuetiti_log_level level, const char* format, ...) {
+	if (broker->callbacks->logx != NULL) {
+		va_list args;
+		va_start(args, format);
+		broker->callbacks->logx(broker, format, args);
+		va_end(args);
+	}
+}

@@ -8,7 +8,7 @@ void emcuetiti_port_onpublishready(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* topic, buffers_buffer* payload) {
 	for (int p = 0; p < ARRAY_ELEMENTS(broker->ports); p++) {
 		if (broker->ports[p] != NULL) {
-			broker->callbacks->log(broker, "dispatching publish to port %d", p);
+			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "dispatching publish to port %d", p);
 			if (broker->ports[p]->publishreadycallback != NULL)
 				broker->ports[p]->publishreadycallback(broker, topic, payload,
 						broker->ports[p]->portdata);

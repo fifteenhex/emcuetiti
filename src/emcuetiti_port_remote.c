@@ -1,3 +1,19 @@
+/*	This file is part of emcuetiti.
+ *
+ * emcuetiti is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * emcuetiti is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with emcuetiti.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
@@ -19,7 +35,7 @@ static int emcuetiti_port_remote_publishready(emcuetiti_brokerhandle* broker,
 
 	size_t payloadlen = buffers_buffer_available(&bufferreference.buffer);
 
-	broker->callbacks->log(broker,
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 			"sending publish to remote, %d payload bytes %d %d", payloadlen,
 			*buffer->refs, *bufferreference.buffer.refs);
 
@@ -39,7 +55,7 @@ static int emcuetiti_port_remote_publishready(emcuetiti_brokerhandle* broker,
 
 	buffers_buffer_unref(&bufferreference.buffer);
 
-	broker->callbacks->log(broker, "finished");
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "finished");
 
 	return 0;
 }
@@ -49,13 +65,14 @@ static void emcuetiti_port_remote_movetostate(
 		emcuetiti_port_remote_state newstate) {
 	memset(&portdata->statedata, 0, sizeof(portdata->statedata));
 	portdata->state = newstate;
-	portdata->broker->callbacks->log(portdata->broker, "s:%d", newstate);
+	emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG, "s:%d",
+			newstate);
 }
 
 static void processtopicpart(buffers_buffer* topicbuffer, void* data) {
 	emcuetiti_port_remote_portdata* portdata =
 			(emcuetiti_port_remote_portdata*) data;
-	portdata->broker->callbacks->log(portdata->broker, "toppart: %s",
+	emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG, "toppart: %s",
 			topicbuffer->buffer);
 	portdata->topic = emcuetiti_findtopic(portdata->broker, portdata->topic,
 			topicbuffer->buffer);
@@ -77,11 +94,19 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 		}
 			break;
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {
-			if (portdata->publish == NULL)
+			if (portdata->publish == NULL) {
 				portdata->publish = emcuetiti_broker_getpayloadbuffer(
-						portdata->broker);
+						portdata->broker, &portdata->buffsz);
+				emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG,
+						"here xx");
+			}
 			if (portdata->publish != NULL) {
-				BUFFERS_STATICBUFFER_TO_BUFFER(portdata->publish, pubbuff);
+
+				BUFFERS_STATICBUFFER_TO_BUFFER_SIZE(portdata->publish, pubbuff,
+						portdata->buffsz);
+				emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG,
+						"here dkdkdkd %d %d %d", buffers_buffer_free(&pubbuff),
+						buffers_buffer_available(&pubbuff), pubbuff);
 				ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
 			} else
 				ret = LIBMQTT_EWOULDBLOCK;
@@ -89,8 +114,8 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 			break;
 		}
 	} else {
-		portdata->broker->callbacks->log(portdata->broker, "wr: %c[%02x]",
-				buffer[0], buffer[0]);
+		emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG,
+				"wr: %c[%02x]", buffer[0], buffer[0]);
 		ret = 1;
 	}
 	return ret;
@@ -102,7 +127,7 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
 	emcuetiti_port_remote_portdata* portdata =
 			(emcuetiti_port_remote_portdata*) userdata;
 
-	portdata->broker->callbacks->log(portdata->broker, "ps:%d",
+	emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG, "ps:%d",
 			(int) pkt->state);
 
 	BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuff);
@@ -115,13 +140,15 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
 	}
 		break;
 	case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:
-		portdata->broker->callbacks->log(portdata->broker, "tl:%u",
+		emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG, "tl:%u",
 				pkt->varhdr.publish.topiclen);
 		break;
 	case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD:
-		portdata->broker->callbacks->log(portdata->broker, "pl:%u",
-				pkt->length - pkt->pos);
-		processtopicpart(&topbuff, portdata);
+		if (previousstate != LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD) {
+			emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG, "pl:%u",
+					pkt->length - pkt->pos);
+			processtopicpart(&topbuff, portdata);
+		}
 		break;
 	case LIBMQTT_PACKETREADSTATE_FINISHED:
 		if (pkt->type == LIBMQTT_PACKETTYPE_PUBLISH)
@@ -149,13 +176,14 @@ static bool emcuetiti_port_remote_readpacket(
 		if (packetfinished) {
 			switch (pkt->state) {
 			case LIBMQTT_PACKETREADSTATE_ERROR:
-				portdata->broker->callbacks->log(portdata->broker, "error");
+				emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG,
+						"error");
 				emcuetiti_port_remote_movetostate(portdata,
 						REMOTEPORTSTATE_ERROR);
 				break;
 			case LIBMQTT_PACKETREADSTATE_FINISHED:
-				portdata->broker->callbacks->log(portdata->broker, "type %d",
-						pkt->type);
+				emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG,
+						"type %d", pkt->type);
 				ret = true;
 				break;
 			}
@@ -275,7 +303,7 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 
 		if (data->publishwaiting) {
 
-			BUFFERS_STATICBUFFER_TO_BUFFER(data->publish, pb);
+			BUFFERS_STATICBUFFER_TO_BUFFER_SIZE(data->publish, pb, data->buffsz);
 
 			emcuetiti_publish pub = { .topic = data->topic,
 			/*emcuetiti_writefunc writefunc;*/
@@ -288,7 +316,7 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 
 			emcuetiti_broker_publish(data->broker, &pub);
 
-			buffers_buffer_unref(&pub);
+			buffers_buffer_unref(&pb);
 
 			data->publishwaiting = false;
 			data->publish = NULL;

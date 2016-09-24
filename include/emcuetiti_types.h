@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdarg.h>
 
 #include "emcuetiti_config.h"
 #include "libmqtt.h"
@@ -39,7 +40,7 @@ typedef void (*emcuetiti_disconnectfunc)(emcuetiti_brokerhandle* broker,
 typedef emcuetiti_timestamp (*emcuetiti_timstampfunc)(void);
 
 typedef void (*emcuetiti_logfunc)(const emcuetiti_brokerhandle* broker,
-		const char* msg, ...);
+		const char* msg, va_list args);
 
 // shared structures
 struct emcuetiti_topichandle {
@@ -98,6 +99,8 @@ typedef struct {
 
 typedef struct {
 	emcuetiti_topichandle* topic;
+
+	size_t* buffsz;
 	uint8_t* payloadbuff;
 } clientregisters_publish;
 
@@ -164,7 +167,7 @@ typedef struct {
 	emcuetiti_timstampfunc timestamp;
 
 // optional
-	emcuetiti_logfunc log;
+	emcuetiti_logfunc logx;
 
 // client funcs
 	emcuetiti_isconnected isconnectedfunc;

@@ -3,12 +3,21 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "libmqtt.h"
+#include "util.h"
 
-#define BUFFERS_STATICBUFFER_TO_BUFFER(s, b) size_t b##_size = sizeof(s);\
+
+#define BUFFERS_STATICBUFFER_TO_BUFFER(s, b) \
+	__must_be_array(s); \
+	size_t b##_size = sizeof(s); \
 	buffers_buffer b; \
-	buffers_staticbuffer_tobuffer(s, &b##_size, &b)
+	buffers_staticbuffer_tobuffer((uint8_t*) s, &b##_size, &b)
+
+#define BUFFERS_STATICBUFFER_TO_BUFFER_SIZE(s, b, sz) \
+	buffers_buffer b; \
+	buffers_staticbuffer_tobuffer((uint8_t*) s, &sz, &b)
 
 void buffers_staticbuffer_tobuffer(uint8_t* staticbuffer, size_t* sz,
 		buffers_buffer* buffer);

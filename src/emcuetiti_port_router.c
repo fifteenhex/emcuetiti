@@ -4,6 +4,7 @@
 #include "emcuetiti_port_router.h"
 #include "emcuetiti_client.h"
 #include "emcuetiti_broker.h"
+#include "emcuetiti_log.h"
 #include "buffers.h"
 
 static int emcuetiti_port_publishreadycallback(emcuetiti_brokerhandle* broker,
@@ -15,7 +16,7 @@ static int emcuetiti_port_publishreadycallback(emcuetiti_brokerhandle* broker,
 
 	size_t payloadlen = buffers_buffer_available(&bufferreference.buffer);
 
-	broker->callbacks->log(broker,
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 			"routing publish to clients, have %d payload bytes %d %d",
 			payloadlen, *buffer->refs, *bufferreference.buffer.refs);
 

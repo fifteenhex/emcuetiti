@@ -7,6 +7,7 @@
 #include "emcuetiti_error.h"
 #include "emcuetiti_port.h"
 #include "emcuetiti_broker.h"
+#include "emcuetiti_log.h"
 
 #include "buffers.h"
 #include "libmqtt_priv.h"
@@ -90,12 +91,12 @@ static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
 	if (expires > now) {
 		EMCUETITI_CONFIG_TIMESTAMPTYPE timebeforeexpiry = expires - now;
 #if EMCUETITI_CONFIG_DEBUG_KEEPALIVE
-		broker->callbacks->log(broker, "client %s expires in %ds",
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "client %s expires in %ds",
 				client->clientid, timebeforeexpiry);
 #endif
 	} else {
-		broker->callbacks->log(broker, "client %s has expired",
-				client->clientid);
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
+				"client %s has expired", client->clientid);
 		emcuetiti_disconnectclient(broker, client);
 	}
 }
@@ -103,17 +104,18 @@ static void emcuetiti_broker_poll_checkkeepalive(emcuetiti_brokerhandle* broker,
 static void emcuetiti_handleinboundpacket_publish(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 
-	BUFFERS_STATICBUFFER_TO_BUFFER(cs->registers.publish.payloadbuff,
-			payloadbuffer);
+	BUFFERS_STATICBUFFER_TO_BUFFER_SIZE(cs->registers.publish.payloadbuff,
+			payloadbuffer, cs->registers.publish.buffsz);
 
 	if (cs->registers.publish.topic != NULL) {
-		broker->callbacks->log(broker, "handling publish, have %d bytes",
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
+				"handling publish, have %d bytes",
 				buffers_buffer_available(&payloadbuffer));
 
 		emcuetiti_port_onpublishready(broker, cs->registers.publish.topic,
 				&payloadbuffer);
 	} else
-		broker->callbacks->log(broker, "dafuq?");
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "dafuq?");
 
 	buffers_buffer_unref(&payloadbuffer);
 
@@ -123,7 +125,7 @@ static void emcuetiti_handleinboundpacket_publish(
 	 cs->client->userdata, messageid);
 	 }
 	 } else {
-	 broker->callbacks->log(broker, "publish to invalid topic");
+	 emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "publish to invalid topic");
 	 emcuetiti_disconnectclient(broker, cs);
 	 }*/
 }
@@ -135,7 +137,7 @@ static void emcuetiti_handleinboardpacket_connect(
 	cs->keepalive = cs->incomingpacket.varhdr.connect.keepalive;
 	int level = cs->incomingpacket.varhdr.connect.level;
 
-	broker->callbacks->log(broker,
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 			"protoname %s, level %d, keepalive %d, clientid %s ", NULL,
 			(int) level, (int) cs->keepalive, cs->clientid);
 
@@ -156,7 +158,7 @@ static void emcuetiti_handleinboundpacket_subscribe(
 	uint16_t messageid = cs->incomingpacket.varhdr.msgid;
 	uint16_t num = cs->registers.subunsub.subscriptionspending;
 
-	broker->callbacks->log(broker,
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 			"processing %d subscriptions from message %d for %s", num,
 			(int) messageid, cs->clientid);
 
@@ -174,7 +176,7 @@ static void emcuetiti_handleinboundpacket_subscribe(
 								cs->registers.subunsub.pendinglevels[i];
 						cs->numsubscriptions++;
 						returncodes[i] = 0;
-						broker->callbacks->log(broker,
+						emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 								"inserted subscription to %s into %s, now have %d",
 								topic->topicpart, cs->clientid,
 								cs->numsubscriptions);
@@ -194,7 +196,8 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 	void* userdata = cs->client->userdata;
 	uint16_t messageid = cs->incomingpacket.varhdr.msgid;
 
-	broker->callbacks->log(broker, "handling %d unsubscriptions",
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
+			"handling %d unsubscriptions",
 			cs->registers.subunsub.subscriptionspending);
 
 	for (int i = 0; i < cs->registers.subunsub.subscriptionspending; i++) {
@@ -203,7 +206,7 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 					== cs->registers.subunsub.pendingtopics[i]) {
 				cs->subscriptions[j].topic = NULL;
 				cs->numsubscriptions--;
-				cs->broker->callbacks->log(broker,
+				emcuetiti_log(cs->broker, EMCUETITI_LOG_LEVEL_DEBUG,
 						"cleared subscription from %s, now have %d",
 						cs->clientid, cs->numsubscriptions);
 				break;
@@ -217,14 +220,15 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 
 static void emcuetiti_handleinboundpacket_disconnect(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	broker->callbacks->log(broker, "client %s has requested to disconnect",
-			cs->clientid);
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
+			"client %s has requested to disconnect", cs->clientid);
 	emcuetiti_disconnectclient(broker, cs);
 }
 
 static void emcuetiti_handleinboundpacket_pingreq(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	broker->callbacks->log(broker, "pingreq from %s", cs->clientid);
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "pingreq from %s",
+			cs->clientid);
 	libmqtt_construct_pingresp(emcuetiti_client_resolvewritefunc(broker, cs),
 			cs->client->userdata);
 }
@@ -254,7 +258,7 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		emcuetiti_handleinboundpacket_disconnect(broker, cs);
 		break;
 	default:
-		broker->callbacks->log(broker,
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 				"unhandled packet type %d from client %s",
 				(int) cs->incomingpacket.type, cs->clientid);
 		break;
@@ -283,7 +287,7 @@ int emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 				cs->broker = broker;
 
 				broker->registeredclients++;
-				broker->callbacks->log(broker,
+				emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 						"registered client, now have %d clients",
 						broker->registeredclients);
 
@@ -312,7 +316,7 @@ void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 
 		if (unregistered) {
 			broker->registeredclients--;
-			broker->callbacks->log(broker,
+			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 					"unregistered client, %d clients left",
 					broker->registeredclients);
 		}
@@ -352,11 +356,13 @@ static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD: {
 			if (cs->registers.publish.payloadbuff == NULL)
 				cs->registers.publish.payloadbuff =
-						emcuetiti_broker_getpayloadbuffer(cs->broker);
+						emcuetiti_broker_getpayloadbuffer(cs->broker,
+								&cs->registers.publish.buffsz);
 
 			if (cs->registers.publish.payloadbuff != NULL) {
-				BUFFERS_STATICBUFFER_TO_BUFFER(
-						cs->registers.publish.payloadbuff, payloadbuff);
+				BUFFERS_STATICBUFFER_TO_BUFFER_SIZE(
+						cs->registers.publish.payloadbuff, payloadbuff,
+						cs->registers.publish.buffsz);
 				ret = buffers_buffer_append(&payloadbuff, buffer, len);
 			} else
 				ret = LIBMQTT_EWOULDBLOCK;
@@ -482,7 +488,7 @@ void emcuetiti_client_dumpstate(emcuetiti_brokerhandle* broker,
 	}
 
 	if (client->client != NULL)
-		broker->callbacks->log(broker, "%s\t%s\t%d - subs %d", client->clientid,
-				state, (int) client->incomingpacket.state,
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "%s\t%s\t%d - subs %d",
+				client->clientid, state, (int) client->incomingpacket.state,
 				(int) client->numsubscriptions);
 }

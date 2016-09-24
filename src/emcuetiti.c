@@ -1,3 +1,19 @@
+/*	This file is part of emcuetiti.
+ *
+ * emcuetiti is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * emcuetiti is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with emcuetiti.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <string.h>
 
 #include "libmqtt.h"
@@ -14,9 +30,9 @@ static void emcuetiti_broker_dumpstate_printtopic(
 	bool first = node->parent == NULL;
 	if (!first) {
 		emcuetiti_broker_dumpstate_printtopic(broker, node->parent);
-		broker->callbacks->log(broker, "/");
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "/");
 	}
-	broker->callbacks->log(broker, "%s", node->topicpart);
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "%s", node->topicpart);
 }
 
 void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
@@ -28,13 +44,13 @@ void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 		emcuetiti_publish* publish) {
 
-	broker->callbacks->log(broker, "outgoing publish to");
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "outgoing publish to");
 	emcuetiti_broker_dumpstate_printtopic(broker, publish->topic);
 
 	for (int c = 0; c < ARRAY_ELEMENTS(broker->clients); c++) {
 		emcuetiti_clientstate* cs = &broker->clients[c];
 		if (cs->state == CLIENTSTATE_CONNECTED) {
-			broker->callbacks->log(broker,
+			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 					"checking client %s, has %d subscriptions", cs->clientid,
 					cs->numsubscriptions);
 			bool subbed = false;
@@ -43,19 +59,19 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 				emcuetiti_topichandle* topic = sub->topic;
 				if (topic != NULL) {
 
-					broker->callbacks->log(broker, "topic %s",
+					emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "topic %s",
 							topic->topicpart);
 
 					if (topic == publish->topic) {
 						subbed = true;
 					} else if (sub->level == THISANDABOVE) {
-						broker->callbacks->log(broker,
+						emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 								"looking for wildcard subscription below this level");
 						emcuetiti_topichandle* t = publish->topic;
 						while (t->parent != NULL) {
 							t = t->parent;
 							if (t == topic) {
-								broker->callbacks->log(broker,
+								emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 										"found wild card sub below target");
 								subbed = true;
 								break;
@@ -69,8 +85,8 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 			}
 
 			if (subbed) {
-				broker->callbacks->log(broker, "sending publish to %s",
-						cs->clientid);
+				emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
+						"sending publish to %s", cs->clientid);
 
 				libmqtt_writefunc clientwritefunc =
 						emcuetiti_client_resolvewritefunc(broker,
@@ -94,7 +110,7 @@ void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
 		}
 	}
 
-	broker->callbacks->log(broker, "finished");
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "finished");
 }
 
 void emcuetiti_broker_init(emcuetiti_brokerhandle* broker) {
@@ -117,11 +133,11 @@ static void emcuetiti_broker_dumpstate_child(emcuetiti_brokerhandle* broker,
 }
 
 void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker) {
-	broker->callbacks->log(broker, "-- Topic hierachy --");
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "-- Topic hierachy --");
 	emcuetiti_topichandle* th = broker->root;
 	emcuetiti_broker_dumpstate_child(broker, th);
 
-	broker->callbacks->log(broker, "-- Clients --");
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "-- Clients --");
 	for (int i = 0; i < ARRAY_ELEMENTS(broker->clients); i++) {
 		emcuetiti_clientstate* cs = &(broker->clients[i]);
 		emcuetiti_client_dumpstate(broker, cs);
@@ -132,13 +148,15 @@ bool emcuetiti_broker_canacceptmoreclients(emcuetiti_brokerhandle* broker) {
 	return broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS;
 }
 
-uint8_t* emcuetiti_broker_getpayloadbuffer(emcuetiti_brokerhandle* broker) {
+uint8_t* emcuetiti_broker_getpayloadbuffer(emcuetiti_brokerhandle* broker,
+		size_t* size) {
 	for (int i = 0; i < EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS; i++) {
-		uint8_t* bufferaddress = &broker->inflightpayloads[i];
-		BUFFERS_STATICBUFFER_TO_BUFFER(bufferaddress, payloadbuffer);
+		BUFFERS_STATICBUFFER_TO_BUFFER(broker->inflightpayloads[i],
+				payloadbuffer);
+		*size = *payloadbuffer.size;
 		if (!buffers_buffer_inuse(&payloadbuffer)) {
 			buffers_buffer_ref(&payloadbuffer);
-			return bufferaddress;
+			return &broker->inflightpayloads[i];
 		}
 	}
 	return NULL;

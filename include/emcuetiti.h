@@ -6,3 +6,4 @@
 #include "emcuetiti_port.h"
 #include "emcuetiti_error.h"
 #include "emcuetiti_topic.h"
+#include "emcuetiti_log.h"

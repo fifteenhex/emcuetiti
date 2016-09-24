@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include <stdio.h>
+#include <assert.h>
 
 #include "libmqtt_priv.h"
 #include "libmqtt.h"
@@ -529,6 +530,8 @@ static int libmqtt_readpkt_publishstates(libmqtt_packetread* pkt, 			//
 		libmqtt_packetreadchange changefunc, void* changeuserdata, 	//
 		libmqtt_readfunc readfunc, void* readuserdata, 				//
 		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata) {
+
+	assert(pkt->type == LIBMQTT_PACKETTYPE_PUBLISH);
 
 	int ret = 0;
 

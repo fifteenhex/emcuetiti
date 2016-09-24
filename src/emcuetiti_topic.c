@@ -3,13 +3,14 @@
 
 #include "emcuetiti_config.h"
 #include "emcuetiti_topic.h"
+#include "emcuetiti_log.h"
 
 #include "buffers.h"
 
 emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, const char* topicpart) {
 
-	broker->callbacks->log(broker, "looking for %s", topicpart);
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "looking for %s", topicpart);
 	if (root == NULL)
 		root = broker->root;
 	else
@@ -17,10 +18,10 @@ emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
 
 	for (; root != NULL; root = root->sibling) {
 		if (strcmp(root->topicpart, topicpart) == 0) {
-			broker->callbacks->log(broker, "found %s", topicpart);
+			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "found %s", topicpart);
 			return root;
 		} else
-			broker->callbacks->log(broker, "not %s", root->topicpart);
+			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "not %s", root->topicpart);
 	}
 
 	return NULL;
