@@ -36,8 +36,8 @@ void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 void emcuetiti_broker_init(emcuetiti_brokerhandle* broker);
 void emcuetiti_broker_dumpstate(emcuetiti_brokerhandle* broker);
 
-void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
+void emcuetiti_broker_publish(const emcuetiti_brokerhandle* broker,
 		emcuetiti_publish* publish);
 bool emcuetiti_broker_canacceptmoreclients(emcuetiti_brokerhandle* broker);
-uint8_t* emcuetiti_broker_getpayloadbuffer(emcuetiti_brokerhandle* broker,
+uint8_t* emcuetiti_broker_getpayloadbuffer(const emcuetiti_brokerhandle* broker,
 		size_t* size);

@@ -26,7 +26,7 @@
 #include "util.h"
 
 static void emcuetiti_broker_dumpstate_printtopic(
-		emcuetiti_brokerhandle* broker, emcuetiti_topichandle* node) {
+		const emcuetiti_brokerhandle* broker, emcuetiti_topichandle* node) {
 	bool first = node->parent == NULL;
 	if (!first) {
 		emcuetiti_broker_dumpstate_printtopic(broker, node->parent);
@@ -41,7 +41,7 @@ void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker) {
 	emcuetiti_client_poll(broker, now);
 }
 
-void emcuetiti_broker_publish(emcuetiti_brokerhandle* broker,
+void emcuetiti_broker_publish(const emcuetiti_brokerhandle* broker,
 		emcuetiti_publish* publish) {
 
 	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "outgoing publish to");
@@ -148,7 +148,7 @@ bool emcuetiti_broker_canacceptmoreclients(emcuetiti_brokerhandle* broker) {
 	return broker->registeredclients < EMCUETITI_CONFIG_MAXCLIENTS;
 }
 
-uint8_t* emcuetiti_broker_getpayloadbuffer(emcuetiti_brokerhandle* broker,
+uint8_t* emcuetiti_broker_getpayloadbuffer(const emcuetiti_brokerhandle* broker,
 		size_t* size) {
 	for (int i = 0; i < EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS; i++) {
 		BUFFERS_STATICBUFFER_TO_BUFFER(broker->inflightpayloads[i],

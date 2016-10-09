@@ -42,7 +42,7 @@ static void emcuetiti_port_sys_onclientconnected(emcuetiti_brokerhandle* broker,
 			emcuetiti_publish publish = { //
 					.topic = &data->topic_sys_client_connect, //
 							.readfunc = buffers_buffer_readfunc, //
-							.resetfunc = buffers_buffer_reset, //
+							.resetfunc = buffers_buffer_resetfunc, //
 							.userdata = &buffer, //
 							.payloadln = payloadlen };
 			emcuetiti_broker_publish(broker, &publish);

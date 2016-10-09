@@ -32,7 +32,7 @@ typedef void* (*emcuetiti_port_sys_encode_client_connect)(
 		emcuetiti_port_sys_connectdata* connectdata, size_t* len);
 typedef void* (*emcuetiti_port_sys_encode_client_disconnect)(
 		emcuetiti_port_sys_disconnectdata* disconnectdata, size_t* len);
-typedef void* (*emcuetiti_port_sys_free)(void* buffer);
+typedef void (*emcuetiti_port_sys_free)(void* buffer);
 
 typedef struct {
 	const emcuetiti_port_sys_encode_client_connect encode_client_connect;

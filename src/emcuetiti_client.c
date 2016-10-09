@@ -42,7 +42,7 @@ emcuetiti_isconnected emcuetiti_client_resolvefunc_isconnected(
 }
 
 libmqtt_writefunc emcuetiti_client_resolvewritefunc(
-		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
+		const emcuetiti_brokerhandle* broker, const emcuetiti_clientstate* cs) {
 	libmqtt_writefunc writefunc = broker->callbacks->writefunc;
 #if EMCUETITI_CONFIG_PERCLIENTCALLBACKS
 #if EMCUETITI_CONFIG_PERCLIENTCALLBACK_WRITE

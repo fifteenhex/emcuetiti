@@ -29,33 +29,35 @@ static int emcuetiti_port_remote_publishready(emcuetiti_brokerhandle* broker,
 	emcuetiti_port_remote_portdata* pd =
 			(emcuetiti_port_remote_portdata*) portdata;
 
-	buffers_buffer_reference bufferreference;
-	buffers_buffer_createreference(buffer, &bufferreference);
-	buffers_buffer_ref(buffer);
+	if (pd->state == REMOTEPORTSTATE_READY) {
+		buffers_buffer_reference bufferreference;
+		buffers_buffer_createreference(buffer, &bufferreference);
+		buffers_buffer_ref(buffer);
 
-	size_t payloadlen = buffers_buffer_available(&bufferreference.buffer);
+		size_t payloadlen = buffers_buffer_available(&bufferreference.buffer);
 
-	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
-			"sending publish to remote, %d payload bytes %d %d", payloadlen,
-			*buffer->refs, *bufferreference.buffer.refs);
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
+				"sending publish to remote, %d payload bytes %d %d", payloadlen,
+				*buffer->refs, *bufferreference.buffer.refs);
 
-	libmqtt_construct_publish(
-			//
-			pd->config->hostops->write,
-			pd->connectiondata, //
-			buffers_buffer_readfunc,
-			&bufferreference.buffer, //
-			emcuetiti_topic_topichandlewriter, topic,
-			emcuetiti_topic_len(topic), //
-			payloadlen, //
-			0, //
-			false, //
-			false, //
-			0);
+		libmqtt_construct_publish(
+				//
+				pd->config->hostops->write,
+				pd->connectiondata, //
+				buffers_buffer_readfunc,
+				&bufferreference.buffer, //
+				emcuetiti_topic_topichandlewriter, topic,
+				emcuetiti_topic_len(topic), //
+				payloadlen, //
+				0, //
+				false, //
+				false, //
+				0);
 
-	buffers_buffer_unref(&bufferreference.buffer);
+		buffers_buffer_unref(&bufferreference.buffer);
 
-	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "finished");
+		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "finished");
+	}
 
 	return 0;
 }
