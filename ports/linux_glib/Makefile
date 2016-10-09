@@ -1,6 +1,6 @@
 include ../../common.mk
 
-PKGS=glib-2.0 gio-2.0
+PKGS=glib-2.0 gio-2.0 json-glib-1.0
 CFLAGS+=`pkg-config --cflags $(PKGS)`
 
 OUTPUTPREFIX=linux_glib_

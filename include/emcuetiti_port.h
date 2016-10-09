@@ -21,8 +21,10 @@
 void emcuetiti_port_onpublishready(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* topic, buffers_buffer* payload);
 
-void emcuetiti_port_onclientconnected(emcuetiti_brokerhandle* broker);
-void emcuetiti_port_onclientdisconnected(emcuetiti_brokerhandle* broker);
+void emcuetiti_port_onclientconnected(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* clientstate);
+void emcuetiti_port_onclientdisconnected(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* clientstate);
 
 void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_porthandle* port);

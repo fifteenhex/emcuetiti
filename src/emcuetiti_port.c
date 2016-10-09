@@ -19,23 +19,25 @@
 #include "emcuetiti_log.h"
 #include "util.h"
 
-void emcuetiti_port_onclientconnected(emcuetiti_brokerhandle* broker) {
+void emcuetiti_port_onclientconnected(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* clientstate) {
 #if  EMCUETITI_CONFIG_PORT_CALLBACK_CLIENTCONNECT
 	for (int i = 0; i < ARRAY_ELEMENTS(broker->ports); i++) {
 		emcuetiti_porthandle* port = broker->ports[i];
 		if (port != NULL && port->callbacks->connected != NULL) {
-			port->callbacks->connected(broker, port->portdata);
+			port->callbacks->connected(broker, clientstate, port->portdata);
 		}
 	}
 #endif
 }
 
-void emcuetiti_port_onclientdisconnected(emcuetiti_brokerhandle* broker) {
+void emcuetiti_port_onclientdisconnected(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* clientstate) {
 #if  EMCUETITI_CONFIG_PORT_CALLBACK_CLIENTDISCONNECT
 	for (int i = 0; i < ARRAY_ELEMENTS(broker->ports); i++) {
 		emcuetiti_porthandle* port = broker->ports[i];
 		if (port != NULL && port->callbacks->disconnected != NULL) {
-			port->callbacks->disconnected(broker, port->portdata);
+			port->callbacks->disconnected(broker, clientstate, port->portdata);
 		}
 	}
 #endif

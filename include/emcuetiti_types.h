@@ -36,10 +36,10 @@ typedef struct emcuetiti_topichandle emcuetiti_topichandle;
 
 typedef int (*emcuetiti_publishreadyfunc)(emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* topic, buffers_buffer* buffer, void* portdata);
-typedef int (*emcuetiti_clientconnectedfunc)(emcuetiti_brokerhandle* broker,
-		void* portdata);
-typedef int (*emcuetiti_clientdisconnectedfunc)(emcuetiti_brokerhandle* broker,
-		void* portdata);
+typedef void (*emcuetiti_clientconnectedfunc)(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* clientstate, void* portdata);
+typedef void (*emcuetiti_clientdisconnectedfunc)(emcuetiti_brokerhandle* broker,
+		emcuetiti_clientstate* clientstate, void* portdata);
 
 typedef bool (*emcuetiti_authenticateclientfunc)(const char* clientid);
 typedef bool (*emcuetiti_isconnected)(void* userdata);
@@ -172,48 +172,48 @@ typedef struct {
 	const emcuetiti_clientconnectedfunc connected;
 #endif
 #if EMCUETITI_CONFIG_PORT_CALLBACK_CLIENTDISCONNECT
-const emcuetiti_clientdisconnectedfunc disconnected;
+	const emcuetiti_clientdisconnectedfunc disconnected;
 #endif
 } emcuetiti_port_callbacks;
 
 typedef struct {
-const emcuetiti_port_callbacks* callbacks;
-void* portdata;
+	const emcuetiti_port_callbacks* callbacks;
+	void* portdata;
 } emcuetiti_porthandle;
 
 // broker structures
 typedef struct {
-emcuetiti_topichandle* topic;
-emcuetiti_writefunc writefunc;
-emcuetiti_readfunc readfunc;
-emcuetiti_freefunc freefunc;
-emcuetiti_resetfunc resetfunc;
-void* userdata;
-size_t payloadln;
+	emcuetiti_topichandle* topic;
+//emcuetiti_writefunc writefunc;
+	emcuetiti_readfunc readfunc;
+	emcuetiti_freefunc freefunc;
+	emcuetiti_resetfunc resetfunc;
+	void* userdata;
+	size_t payloadln;
 } emcuetiti_publish;
 
 typedef struct {
 
-emcuetiti_authenticateclientfunc authenticatecallback;
-emcuetiti_timstampfunc timestamp;
+	emcuetiti_authenticateclientfunc authenticatecallback;
+	emcuetiti_timstampfunc timestamp;
 
 // optional
-emcuetiti_logfunc logx;
+	emcuetiti_logfunc logx;
 
 // client funcs
-emcuetiti_isconnected isconnectedfunc;
-libmqtt_writefunc writefunc;
-emcuetiti_readytoreadfunc readytoread;
-libmqtt_readfunc readfunc;
-emcuetiti_disconnectfunc disconnectfunc;
+	emcuetiti_isconnected isconnectedfunc;
+	libmqtt_writefunc writefunc;
+	emcuetiti_readytoreadfunc readytoread;
+	libmqtt_readfunc readfunc;
+	emcuetiti_disconnectfunc disconnectfunc;
 } emcuetiti_brokerhandle_callbacks;
 
 struct emcuetiti_brokerhandle {
-unsigned registeredclients;
-emcuetiti_topichandle* root;
-emcuetiti_porthandle* ports[EMCUETITI_CONFIG_MAXPORTS];
-emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
-BUFFERS_STATICBUFFERPOOL(inflightpayloads, EMCUETITI_CONFIG_MAXPAYLOADLEN, EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS);
-const emcuetiti_brokerhandle_callbacks* callbacks;
-void* userdata;
+	unsigned registeredclients;
+	emcuetiti_topichandle* root;
+	emcuetiti_porthandle* ports[EMCUETITI_CONFIG_MAXPORTS];
+	emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
+	BUFFERS_STATICBUFFERPOOL(inflightpayloads, EMCUETITI_CONFIG_MAXPAYLOADLEN, EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS);
+	const emcuetiti_brokerhandle_callbacks* callbacks;
+	void* userdata;
 };

@@ -151,3 +151,17 @@ void buffers_buffer_createreference(buffers_buffer* buffer,
 	reference->localtail = *reference->buffer.tail;
 	reference->buffer.tail = &reference->localtail;
 }
+
+void buffers_wrap(buffers_buffer* buffer, buffers_bufferhead* head,
+		void* rawbuffer, size_t* size) {
+
+	head->tail = 0;
+	head->head = *size;
+	head->refs = 0;
+
+	buffer->buffer = rawbuffer;
+	buffer->size = size;
+	buffer->head = &head->head;
+	buffer->tail = &head->tail;
+	buffer->refs = &head->refs;
+}

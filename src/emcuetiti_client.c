@@ -163,7 +163,7 @@ static void emcuetiti_handleinboardpacket_connect(
 				userdata);
 	}
 	cs->state = CLIENTSTATE_CONNECTED;
-	emcuetiti_port_onclientconnected(broker);
+	emcuetiti_port_onclientconnected(broker, cs);
 }
 
 static void emcuetiti_handleinboundpacket_subscribe(

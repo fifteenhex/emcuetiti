@@ -24,6 +24,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.base.1472080187" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
 								<option id="gnu.c.compiler.option.include.paths.341303023" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/include/json-glib-1.0"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.454543909" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
@@ -53,5 +54,10 @@
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.5669477;cdt.managedbuild.toolchain.gnu.base.5669477.1143143603;cdt.managedbuild.tool.gnu.c.compiler.base.1472080187;cdt.managedbuild.tool.gnu.c.compiler.input.454543909">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
+	</storageModule>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Default">
+			<resource resourceType="PROJECT" workspacePath="/emcuetiti"/>
+		</configuration>
 	</storageModule>
 </cproject>

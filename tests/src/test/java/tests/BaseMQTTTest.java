@@ -97,6 +97,23 @@ public class BaseMQTTTest {
         log("Creating clients...");
 
         sysConnection = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT, "$sys/#");
+        Thread sysThread = new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                while (sysConnection.isConnected()) {
+                    try {
+                        Message msg = sysConnection.receive();
+                        String payload = new String(msg.getPayload());
+                        log("sys publish on " + msg.getTopic() + ":" + payload);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        break;
+                    }
+                }
+            }
+        };
+        sysThread.start();
 
         for (int c = 0; c < MQTT_CLIENTS; c++)
             mqttConnections[c] = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT);
