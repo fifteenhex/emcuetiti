@@ -17,6 +17,17 @@
 #pragma once
 
 #include "emcuetiti_types.h"
+#include "emcuetiti_client.h"
+
+struct emcuetiti_brokerhandle {
+	unsigned registeredclients;
+	emcuetiti_topichandle* root;
+	emcuetiti_porthandle* ports[EMCUETITI_CONFIG_MAXPORTS];
+	emcuetiti_clientstate clients[EMCUETITI_CONFIG_MAXCLIENTS];
+	BUFFERS_STATICBUFFERPOOL(inflightpayloads, EMCUETITI_CONFIG_MAXPAYLOADLEN, EMCUETITI_CONFIG_MAXINFLIGHTPAYLOADS);
+	const emcuetiti_brokerhandle_callbacks* callbacks;
+	void* userdata;
+};
 
 void emcuetiti_broker_poll(emcuetiti_brokerhandle* broker);
 void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,

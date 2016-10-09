@@ -133,7 +133,21 @@ typedef enum {
 	LIBMQTT_PACKETREADSTATE_ERROR
 } libmqtt_packetread_state;
 
+// registers
+
 typedef struct {
+	uint8_t type;
+	uint8_t flags;
+	size_t length;
+} libmqtt_packetregisters_common;
+
+typedef struct {
+	libmqtt_packetregisters_common common;
+	uint16_t msgid;
+} libmqtt_packetregisters_justmsgid;
+
+typedef struct {
+	libmqtt_packetregisters_common common;
 	uint8_t level;
 	uint8_t flags;
 	uint16_t keepalive;
@@ -141,33 +155,39 @@ typedef struct {
 } libmqtt_packet_connect;
 
 typedef struct {
+	libmqtt_packetregisters_common common;
 	uint8_t ackflags;
 	uint8_t returncode;
 } libmqtt_packet_connack;
 
 typedef struct {
+	libmqtt_packetregisters_common common;
 	uint16_t msgid;
 	uint16_t topicfilterlen;
 	uint8_t topicfilterqos;
 } libmqtt_packet_subscribe;
 
 typedef struct {
+	libmqtt_packetregisters_common common;
 	uint16_t msgid;
 	uint8_t result;
 } libmqtt_packet_suback;
 
 typedef struct {
+	libmqtt_packetregisters_common common;
 	uint16_t msgid;
 	uint16_t topicfilterlen;
 } libmqtt_packet_unsubscribe;
 
 typedef struct {
+	libmqtt_packetregisters_common common;
 	uint16_t msgid;
 	uint16_t topiclen;
 } libmqtt_packet_publish;
 
 typedef union {
-	uint16_t msgid;
+	libmqtt_packetregisters_common common;
+	libmqtt_packetregisters_justmsgid justmsgid;
 	libmqtt_packet_connect connect;
 	libmqtt_packet_connack connack;
 	libmqtt_packet_publish publish;
@@ -176,19 +196,6 @@ typedef union {
 	libmqtt_packet_unsubscribe unsubscribe;
 } libmqtt_packetread_registers;
 
-typedef struct {
-	libmqtt_packetread_state state;
-	uint8_t type;
-	uint8_t flags;
-	size_t length;
-	libmqtt_packetread_registers varhdr;
-	// secret, don't touch
-	size_t pos;
-	unsigned lenmultiplier;
-	uint8_t counter;
-	BUFFERS_STATICBUFFER(buffer, 64);
-} libmqtt_packetread;
-
 // callbacks
 
 typedef int (*libmqtt_writefunc)(void* userdata, const uint8_t* buffer,
@@ -196,9 +203,6 @@ typedef int (*libmqtt_writefunc)(void* userdata, const uint8_t* buffer,
 typedef int (*libmqtt_readfunc)(void* userdata, uint8_t* buffer, size_t len);
 typedef int (*libmqtt_topicwriter)(libmqtt_writefunc writefunc,
 		void* writefuncuserdata, void* userdata);
-
-typedef int (*libmqtt_packetreadchange)(libmqtt_packetread* pkt,
-		libmqtt_packetread_state previousstate, void* userdata);
 
 // User API
 
@@ -245,7 +249,3 @@ int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 
 int libmqtt_decodelength(uint8_t* buffer, size_t* len);
 
-int libmqtt_readpkt(libmqtt_packetread* pkt, // pkt being read
-		libmqtt_packetreadchange changefunc, void* changeuserdata, // pkt state change callback
-		libmqtt_readfunc readfunc, void* readuserdata, // func and data for reading the packet in
-		libmqtt_writefunc payloadwritefunc, void* payloadwriteuserdata); // func and data for writing the payload out

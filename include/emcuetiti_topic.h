@@ -17,6 +17,7 @@
 #pragma
 
 #include "emcuetiti_types.h"
+#include "emcuetiti_broker.h"
 
 int emcuetiti_topic_topichandlewriter(libmqtt_writefunc writefunc,
 		void *writefuncuserdata, void* userdata);

@@ -17,6 +17,7 @@
 #pragma once
 
 #include "emcuetiti_types.h"
+#include "emcuetiti_broker.h"
 
 #ifdef EMCUETITI_CONFIG_DEBUG
 #define EMCUETITI_LOG_DEBUG(msg, ...) emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, msg, ##__VA_ARGS__)

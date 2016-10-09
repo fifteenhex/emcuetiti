@@ -172,7 +172,7 @@ static void emcuetiti_handleinboundpacket_subscribe(
 
 	uint8_t returncodes[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
 
-	uint16_t messageid = cs->incomingpacket.varhdr.msgid;
+	uint16_t messageid = cs->incomingpacket.varhdr.subscribe.msgid;
 	uint16_t num = cs->registers.subunsub.subscriptionspending;
 
 	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
@@ -211,7 +211,7 @@ static void emcuetiti_handleinboundpacket_subscribe(
 static void emcuetiti_handleinboundpacket_unsubscribe(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
 	void* userdata = cs->client->userdata;
-	uint16_t messageid = cs->incomingpacket.varhdr.msgid;
+	uint16_t messageid = cs->incomingpacket.varhdr.unsubscribe.msgid;
 
 	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 			"handling %d unsubscriptions",
@@ -252,7 +252,7 @@ static void emcuetiti_handleinboundpacket_pingreq(
 
 static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 		emcuetiti_clientstate* cs) {
-	switch (cs->incomingpacket.type) {
+	switch (cs->incomingpacket.varhdr.common.type) {
 // common
 	case LIBMQTT_PACKETTYPE_PINGREQ:
 		emcuetiti_handleinboundpacket_pingreq(broker, cs);
@@ -277,7 +277,7 @@ static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
 	default:
 		emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 				"unhandled packet type %d from client %s",
-				(int) cs->incomingpacket.type, cs->clientid);
+				(int) cs->incomingpacket.varhdr.common.type, cs->clientid);
 		break;
 	}
 }
@@ -343,7 +343,7 @@ void emcuetiti_client_unregister(emcuetiti_brokerhandle* broker,
 static void processtopicpart(buffers_buffer* topicpart, void* userdata) {
 	emcuetiti_clientstate* cs = (emcuetiti_clientstate*) userdata;
 
-	if (cs->incomingpacket.type == LIBMQTT_PACKETTYPE_PUBLISH) {
+	if (cs->incomingpacket.varhdr.common.type == LIBMQTT_PACKETTYPE_PUBLISH) {
 		cs->registers.publish.topic = emcuetiti_findtopic(cs->broker,
 				cs->registers.publish.topic, topicpart->buffer);
 	} else {
@@ -363,7 +363,7 @@ static int emcuetiti_client_writefunc(void* userdata, const uint8_t* buffer,
 
 	BUFFERS_STATICBUFFER_TO_BUFFER(cs->buffer, cidb);
 
-	switch (cs->incomingpacket.type) {
+	switch (cs->incomingpacket.varhdr.common.type) {
 	case LIBMQTT_PACKETTYPE_PUBLISH:
 		switch (cs->incomingpacket.state) {
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC:

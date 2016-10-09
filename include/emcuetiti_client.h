@@ -16,7 +16,69 @@
 
 #pragma once
 
+#include "emcuetiti_config.h"
 #include "emcuetiti_types.h"
+
+typedef enum {
+	CLIENTSTATE_NEW, // client has just connected to us
+	CLIENTSTATE_CONNECTED, // client has completed MQTT handshake
+	CLIENTSTATE_DISCONNECTED
+} emcuetiti_clientconnectionstate;
+
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS
+typedef struct {
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_ISCONNECTED
+	emcuetiti_isconnected isconnectedfunc;
+#endif
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_WRITE
+	libmqtt_writefunc writefunc; // function pointer to the function used to write data to the client
+#endif
+#if EMCUETITI_CONFIG_PERCLIENTCALLBACKS_READYTOREAD
+	emcuetiti_readytoreadfunc readytoread;
+#endif
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_READ
+	emcuetiti_readfunc readfunc; // function pointer to the function user to read data from the client
+#endif
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS_DISCONNECT
+	emcuetiti_disconnectfunc disconnectfunc; //
+#endif
+}emcuetiti_clientops;
+#endif
+
+struct emcuetiti_clienthandle {
+#if EMCUETITI_CONFIG_CLIENTCALLBACKS
+	const emcuetiti_clientops* ops;
+#endif
+	void* userdata; // use this to stash whatever is needed to write/read the right client
+// in the write/read functions
+};
+
+struct emcuetiti_clientstate {
+	emcuetiti_clienthandle* client;
+	char clientid[LIBMQTT_CLIENTID_MAXLENGTH + 1];
+
+	uint16_t keepalive;
+	EMCUETITI_CONFIG_TIMESTAMPTYPE lastseen;
+
+	unsigned numsubscriptions;
+	emcuetiti_subscription subscriptions[EMCUETITI_CONFIG_MAXSUBSPERCLIENT];
+
+	BUFFERS_STATICBUFFER(buffer, EMCUETITI_CONFIG_CLIENTBUFFERSZ + 1);
+
+	emcuetiti_clientconnectionstate state;
+
+	libmqtt_packetread incomingpacket;
+
+	uint8_t packettype;
+	size_t varheaderandpayloadlen;
+	size_t remainingbytes;
+
+	emcuetiti_topichandle* publishtopic;
+	size_t publishpayloadlen;
+
+	clientregisters registers;
+	emcuetiti_brokerhandle* broker;
+};
 
 int emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_clienthandle* handle);

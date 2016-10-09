@@ -85,7 +85,8 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 	emcuetiti_port_remote_portdata* portdata =
 			(emcuetiti_port_remote_portdata*) userdata;
 
-	if (portdata->statedata.ready.pktread.type == LIBMQTT_PACKETTYPE_PUBLISH) {
+	if (portdata->statedata.ready.pktread.varhdr.common.type
+			== LIBMQTT_PACKETTYPE_PUBLISH) {
 		switch (portdata->statedata.ready.pktread.state) {
 		case LIBMQTT_PACKETREADSTATE_PUBLISH_TOPIC: {
 			BUFFERS_STATICBUFFER_TO_BUFFER(portdata->topicbuffer, topbuf);
@@ -143,12 +144,12 @@ static int emcuetiti_port_remote_readpacket_statechange(libmqtt_packetread* pkt,
 	case LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD:
 		if (previousstate != LIBMQTT_PACKETREADSTATE_PUBLISH_PAYLOAD) {
 			emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG, "pl:%u",
-					pkt->length - pkt->pos);
+					pkt->varhdr.common.length - pkt->pos);
 			processtopicpart(&topbuff, portdata);
 		}
 		break;
 	case LIBMQTT_PACKETREADSTATE_FINISHED:
-		if (pkt->type == LIBMQTT_PACKETTYPE_PUBLISH)
+		if (pkt->varhdr.common.type == LIBMQTT_PACKETTYPE_PUBLISH)
 			portdata->publishwaiting = true;
 		break;
 	}
@@ -180,7 +181,7 @@ static bool emcuetiti_port_remote_readpacket(
 				break;
 			case LIBMQTT_PACKETREADSTATE_FINISHED:
 				emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG,
-						"type %d", pkt->type);
+						"type %d", pkt->varhdr.common.type);
 				ret = true;
 				break;
 			}
@@ -258,9 +259,10 @@ static void emcuetiti_port_remote_state_subscribing(emcuetiti_timestamp now,
 
 		if (statedata->subreqsent) {
 			if (emcuetiti_port_remote_readpacket(data, &statedata->pktread)) {
-				if (statedata->pktread.type == LIBMQTT_PACKETTYPE_SUBACK
+				if (statedata->pktread.varhdr.common.type
+						== LIBMQTT_PACKETTYPE_SUBACK
 						&& statedata->msgid
-								== statedata->pktread.varhdr.msgid) {
+								== statedata->pktread.varhdr.suback.msgid) {
 					emcuetiti_port_remote_nextstate(data);
 					data->statedata.ready.datalastsent = now;
 					data->statedata.ready.datalastreceived = now;
