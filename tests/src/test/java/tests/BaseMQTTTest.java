@@ -29,6 +29,7 @@ public class BaseMQTTTest {
     protected static final short KEEPALIVE = 30;
 
     private static Process brokerProcess;
+    protected static BlockingConnection sysConnection;
     protected static BlockingConnection[] mqttConnections = new BlockingConnection[MQTT_CLIENTS];
 
     public static void log(String message) {
@@ -95,6 +96,7 @@ public class BaseMQTTTest {
 
         log("Creating clients...");
 
+        sysConnection = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT, "$sys/#");
 
         for (int c = 0; c < MQTT_CLIENTS; c++)
             mqttConnections[c] = createBlockingConnection(MQTT_HOSTNAME, MQTT_PORT);

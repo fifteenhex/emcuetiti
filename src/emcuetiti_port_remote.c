@@ -104,9 +104,6 @@ static int emcuetiti_port_remote_readpacket_writer(void* userdata,
 
 				BUFFERS_STATICBUFFER_TO_BUFFER_SIZE(portdata->publish, pubbuff,
 						portdata->buffsz);
-				emcuetiti_log(portdata->broker, EMCUETITI_LOG_LEVEL_DEBUG,
-						"here dkdkdkd %d %d %d", buffers_buffer_free(&pubbuff),
-						buffers_buffer_available(&pubbuff), pubbuff);
 				ret = buffers_buffer_writefunc(&pubbuff, buffer, len);
 			} else
 				ret = LIBMQTT_EWOULDBLOCK;
@@ -379,18 +376,22 @@ static void emcuetiti_port_remote_poll(emcuetiti_timestamp now, void* portdata) 
 	}
 }
 
+static const emcuetiti_port_callbacks callbacks = { //
+		.pollfunc = emcuetiti_port_remote_poll, //
+				.publishreadycallback = emcuetiti_port_remote_publishready, //
+		};
+
 void emcuetiti_port_remote_new(emcuetiti_brokerhandle* broker,
 		emcuetiti_port_remoteconfig* config, emcuetiti_porthandle* port,
 		emcuetiti_port_remote_portdata* portdata) {
-
-	port->pollfunc = emcuetiti_port_remote_poll;
-	port->publishreadycallback = emcuetiti_port_remote_publishready;
 
 	portdata->broker = broker;
 	portdata->config = config;
 	portdata->msgid = 0;
 	portdata->publish = NULL;
 	emcuetiti_port_remote_movetostate(portdata, REMOTEPORTSTATE_NOTCONNECTED);
+
+	port->callbacks = &callbacks;
 	port->portdata = portdata;
 
 	emcuetiti_port_register(broker, port);

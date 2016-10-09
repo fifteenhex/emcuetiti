@@ -124,25 +124,11 @@ public class Remote extends BaseMQTTTest {
     public void remoteToLocal() {
         getBoolFuture(emcuetitiConnected);
         getBoolFuture(emcuetitiSubbed);
-
-
         String payload = "fromremote";
         try {
-            remoteClient.publish(TOPICREMOTETOLOCAL, payload.getBytes(), QoS.AT_MOST_ONCE, false);
+            exchange(localClient, remoteClient, TOPICREMOTETOLOCAL, payload, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-
-        try {
-            localClient.receive(30, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
-        try {
-            Thread.sleep((60 * 1000));
-        } catch (InterruptedException ie) {
-
         }
     }
 
@@ -151,28 +137,11 @@ public class Remote extends BaseMQTTTest {
     public void localToRemote() {
         getBoolFuture(emcuetitiConnected);
         getBoolFuture(emcuetitiSubbed);
-
-        /*String payload = "toremote";
-        byte[] payloadbytes = payload.getBytes();
+        String payload = "toremote";
         try {
-            localClient.publish(TOPICLOCALTOREMOTE, payloadbytes, QoS.AT_MOST_ONCE, false);
+            exchange(remoteClient, localClient, TOPICLOCALTOREMOTE, payload, false);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-
-        try {
-            Message message = remoteClient.receive(30, TimeUnit.SECONDS);
-            assert message != null;
-            String payloadIn = new String(message.getPayload(), "UTF-8");
-            assert payloadIn.equals(payload) : "wanted [" + payload + "] got [" + payloadIn + "]";
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }*/
-
-        try {
-            Thread.sleep((60 * 1000));
-        } catch (InterruptedException ie) {
-
         }
     }
 

@@ -14,16 +14,21 @@
  * along with emcuetiti.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include <glib.h>
 
-#include "emcuetiti_types.h"
+#include "sys.h"
+#include "commandline.h"
+#include "emcuetiti_port.h"
+#include "emcuetiti_port_sys.h"
 
-void emcuetiti_port_onpublishready(emcuetiti_brokerhandle* broker,
-		emcuetiti_topichandle* topic, buffers_buffer* payload);
+int sys_init(emcuetiti_brokerhandle* broker) {
+	int ret = 0;
 
-void emcuetiti_port_onclientconnected(emcuetiti_brokerhandle* broker);
-void emcuetiti_port_onclientdisconnected(emcuetiti_brokerhandle* broker);
+	if (commandline_sys) {
+		emcuetiti_porthandle* porthandle = g_malloc(
+				sizeof(emcuetiti_porthandle));
+		emcuetiti_port_sys_new(broker, porthandle);
+	}
 
-void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
-		emcuetiti_porthandle* port);
-
+	return ret;
+}

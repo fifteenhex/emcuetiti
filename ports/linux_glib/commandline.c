@@ -1,3 +1,19 @@
+/*	This file is part of emcuetiti.
+ *
+ * emcuetiti is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * emcuetiti is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with emcuetiti.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #define GETTEXT_PACKAGE "gtk20"
 #include <glib.h>
 
@@ -6,6 +22,7 @@
 // broker
 int commandline_port;
 gchar** commandline_topics;
+gboolean commandline_sys;
 
 // remote
 char* commandline_remote_host = NULL;
@@ -18,6 +35,8 @@ static const GOptionEntry entries[] = { //
 				"port" }, //
 				{ "topic", 't', 0, G_OPTION_ARG_STRING_ARRAY,
 						&commandline_topics, "topic", "topic" }, //
+				{ "sys", 's', 0, G_OPTION_ARG_INT, &commandline_sys, "sys",
+						"sys" }, //
 				NULL };
 
 static const GOptionEntry remote_entries[] = { //

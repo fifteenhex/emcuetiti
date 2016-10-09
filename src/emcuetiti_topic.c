@@ -1,5 +1,20 @@
+/*	This file is part of emcuetiti.
+ *
+ * emcuetiti is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * emcuetiti is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with emcuetiti.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <string.h>
-#include <stdio.h>
 
 #include "emcuetiti_config.h"
 #include "emcuetiti_topic.h"
@@ -10,7 +25,8 @@
 emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, const char* topicpart) {
 
-	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "looking for %s", topicpart);
+	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "looking for %s",
+			topicpart);
 	if (root == NULL)
 		root = broker->root;
 	else
@@ -18,10 +34,12 @@ emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
 
 	for (; root != NULL; root = root->sibling) {
 		if (strcmp(root->topicpart, topicpart) == 0) {
-			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "found %s", topicpart);
+			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "found %s",
+					topicpart);
 			return root;
 		} else
-			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "not %s", root->topicpart);
+			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "not %s",
+					root->topicpart);
 	}
 
 	return NULL;
@@ -36,14 +54,12 @@ int emcuetiti_topic_len(emcuetiti_topichandle* node) {
 	return len + node->topicpartln;
 }
 
-static void emcuetiti_attach(emcuetiti_topichandle* level,
-		emcuetiti_topichandle* sibling) {
+static void emcuetiti_topic_attach(emcuetiti_brokerhandle* broker,
+		emcuetiti_topichandle* level, emcuetiti_topichandle* sibling) {
 	for (; level->sibling != NULL; level = level->sibling) {
 
 	}
-#ifdef EMCUETITI_CONFIG_DEBUG
-	printf("attaching to %s\n", level->topicpart);
-#endif
+	EMCUETITI_LOG_DEBUG("attaching to %s", level->topicpart);
 	level->sibling = sibling;
 }
 
@@ -86,14 +102,14 @@ void emcuetiti_broker_addtopicpart(emcuetiti_brokerhandle* broker,
 			broker->root = part;
 		// otherwise attach to the bottom of the broker's root
 		else
-			emcuetiti_attach(broker->root, part);
+			emcuetiti_topic_attach(broker, broker->root, part);
 	} else {
 		// if this root doesn't have a child yet become that child
 		if (root->child == NULL)
 			root->child = part;
 		// otherwise attach to the bottom of the child
 		else {
-			emcuetiti_attach(root->child, part);
+			emcuetiti_topic_attach(broker, root->child, part);
 		}
 		part->parent = root;
 	}
@@ -109,7 +125,7 @@ emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 	uint16_t len = (*(buffer++) << 8) | *(buffer++);
 	emcuetiti_subscription_level sublevel = ONLYTHIS;
 
-	printf("part len is %d\n", len);
+	EMCUETITI_LOG_DEBUG("part len is %d", len);
 
 	emcuetiti_topichandle* t = NULL;
 	for (uint16_t i = 0; i < len; i++) {
@@ -119,16 +135,16 @@ emcuetiti_topichandle* emcuetiti_readtopicstringandfindtopic(
 			topicpart[topicpartpos] = '\0';
 
 			if (strcmp(topicpart, "#") == 0) {
-				printf("have multilevel wildcard\n");
+				EMCUETITI_LOG_DEBUG("have multilevel wildcard");
 				sublevel = THISANDABOVE;
 			} else {
-				printf("%s\n", topicpart);
+				EMCUETITI_LOG_DEBUG("%s", topicpart);
 				t = emcuetiti_findtopic(broker, t, topicpart);
 			}
 		} else if (byte == '/') {
 			topicpart[topicpartpos] = '\0';
 			topicpartpos = 0;
-			printf("%s\n", topicpart);
+			EMCUETITI_LOG_DEBUG("%s", topicpart);
 			t = emcuetiti_findtopic(broker, t, topicpart);
 		} else
 			topicpart[topicpartpos++] = byte;

@@ -16,14 +16,6 @@
 
 #pragma once
 
-#include "emcuetiti_types.h"
+#include "emcuetiti_broker.h"
 
-void emcuetiti_port_onpublishready(emcuetiti_brokerhandle* broker,
-		emcuetiti_topichandle* topic, buffers_buffer* payload);
-
-void emcuetiti_port_onclientconnected(emcuetiti_brokerhandle* broker);
-void emcuetiti_port_onclientdisconnected(emcuetiti_brokerhandle* broker);
-
-void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
-		emcuetiti_porthandle* port);
-
+int sys_init(emcuetiti_brokerhandle* broker);
