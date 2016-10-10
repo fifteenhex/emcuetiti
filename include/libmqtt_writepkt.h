@@ -19,6 +19,11 @@ typedef int (*libmqtt_packetwritechange)(libmqtt_packetwrite* pkt,
 
 void libmqtt_writepkt_reset(libmqtt_packetwrite* pkt);
 
+void libmqtt_writepkt_puback(libmqtt_packetwrite* pkt, uint16_t messageid);
+void libmqtt_writepkt_pubrec(libmqtt_packetwrite* pkt, uint16_t messageid);
+void libmqtt_writepkt_pubrel(libmqtt_packetwrite* pkt, uint16_t messageid);
+void libmqtt_writepkt_pubcomp(libmqtt_packetwrite* pkt, uint16_t messageid);
+void libmqtt_writepkt_unsuback(libmqtt_packetwrite* pkt, uint16_t messageid);
 void libmqtt_writepkt_pingreq(libmqtt_packetwrite* pkt);
 void libmqtt_writepkt_pingresp(libmqtt_packetwrite* pkt);
 void libmqtt_writepkt_disconnect(libmqtt_packetwrite* pkt);

@@ -26,25 +26,52 @@ void libmqtt_writepkt_reset(libmqtt_packetwrite* pkt) {
 	pkt->state = LIBMQTT_PACKETREADSTATE_IDLE;
 }
 
-void libmqtt_writepkt_pingreq(libmqtt_packetwrite* pkt) {
+static void libmqtt_writepkt_simple(libmqtt_packetwrite* pkt, uint8_t type) {
 	pkt->state = LIBMQTT_PACKETREADSTATE_TYPE;
-	pkt->varhdr.common.type = LIBMQTT_PACKETTYPE_PINGREQ;
+	pkt->varhdr.common.type = type;
 	pkt->varhdr.common.flags = 0;
 	pkt->varhdr.common.length = 2;
+}
+
+static void libmqtt_writepkt_justmsgid(libmqtt_packetwrite* pkt, uint8_t type,
+		uint8_t flags, uint16_t msgid) {
+	pkt->state = LIBMQTT_PACKETREADSTATE_TYPE;
+	pkt->varhdr.common.type = type;
+	pkt->varhdr.common.flags = flags;
+	pkt->varhdr.common.length = 4;
+	pkt->varhdr.justmsgid.msgid = msgid;
+}
+
+void libmqtt_writepkt_puback(libmqtt_packetwrite* pkt, uint16_t messageid) {
+	libmqtt_writepkt_justmsgid(pkt, LIBMQTT_PACKETTYPE_PUBACK, 0, messageid);
+}
+
+void libmqtt_writepkt_pubrec(libmqtt_packetwrite* pkt, uint16_t messageid) {
+	libmqtt_writepkt_justmsgid(pkt, LIBMQTT_PACKETTYPE_PUBREC, 0, messageid);
+}
+
+void libmqtt_writepkt_pubrel(libmqtt_packetwrite* pkt, uint16_t messageid) {
+	libmqtt_writepkt_justmsgid(pkt, LIBMQTT_PACKETTYPE_PUBREL, 0, messageid);
+}
+
+void libmqtt_writepkt_pubcomp(libmqtt_packetwrite* pkt, uint16_t messageid) {
+	libmqtt_writepkt_justmsgid(pkt, LIBMQTT_PACKETTYPE_PUBCOMP, 0, messageid);
+}
+
+void libmqtt_writepkt_unsuback(libmqtt_packetwrite* pkt, uint16_t messageid) {
+	libmqtt_writepkt_justmsgid(pkt, LIBMQTT_PACKETTYPE_UNSUBACK, 0, messageid);
+}
+
+void libmqtt_writepkt_pingreq(libmqtt_packetwrite* pkt) {
+	libmqtt_writepkt_simple(pkt, LIBMQTT_PACKETTYPE_PINGREQ);
 }
 
 void libmqtt_writepkt_pingresp(libmqtt_packetwrite* pkt) {
-	pkt->state = LIBMQTT_PACKETREADSTATE_TYPE;
-	pkt->varhdr.common.type = LIBMQTT_PACKETTYPE_PINGRESP;
-	pkt->varhdr.common.flags = 0;
-	pkt->varhdr.common.length = 2;
+	libmqtt_writepkt_simple(pkt, LIBMQTT_PACKETTYPE_PINGRESP);
 }
 
 void libmqtt_writepkt_disconnect(libmqtt_packetwrite* pkt) {
-	pkt->state = LIBMQTT_PACKETREADSTATE_TYPE;
-	pkt->varhdr.common.type = LIBMQTT_PACKETTYPE_DISCONNECT;
-	pkt->varhdr.common.flags = 0;
-	pkt->varhdr.common.length = 2;
+	libmqtt_writepkt_simple(pkt, LIBMQTT_PACKETTYPE_DISCONNECT);
 }
 
 static int libmqtt_writepkt_changestate(libmqtt_packetwrite* pkt,
@@ -82,6 +109,22 @@ static int libmqtt_writepkt_write(libmqtt_packetwrite* pkt,
 	return ret;
 }
 
+static int libmqtt_writepkt_u16(libmqtt_packetwrite* pkt,
+		libmqtt_packetwritechange changefunc,
+		void* changeuserdata, 	//
+		libmqtt_writefunc writefunc, void* writeuserdata, uint16_t value,
+		libmqtt_packetread_state nextstate) {
+
+	uint8_t b = (value >> (8 * (1 - pkt->counter))) & 0xff;
+	int ret = libmqtt_writepkt_write(pkt, writefunc, writeuserdata, &b, 1);
+	if (ret == 1) {
+		if (pkt->counter == 2)
+			libmqtt_writepkt_changestate(pkt, changefunc, nextstate,
+					changeuserdata);
+	};
+	return ret;
+}
+
 static int libmqtt_writepkt_u8(libmqtt_packetwrite* pkt,
 		libmqtt_packetwritechange changefunc,
 		void* changeuserdata, 	//
@@ -109,14 +152,15 @@ static int libmqtt_writepkt_commonstates(libmqtt_packetwrite* pkt, 			//
 	}
 		break;
 	case LIBMQTT_PACKETREADSTATE_LEN: {
-		uint8_t len = 0;
+		uint8_t len = pkt->varhdr.common.length - 2;
 		ret = libmqtt_writepkt_u8(pkt, changefunc, changeuserdata, writefunc,
 				writeuserdata, len, LIBMQTT_PACKETREADSTATE_MSGID);
 	}
 		break;
 	case LIBMQTT_PACKETREADSTATE_MSGID:
-		libmqtt_writepkt_changestate(pkt, changefunc,
-				LIBMQTT_PACKETREADSTATE_FINISHED, changeuserdata);
+		ret = libmqtt_writepkt_u16(pkt, changefunc, changeuserdata, writefunc,
+				writeuserdata, pkt->varhdr.justmsgid.msgid,
+				LIBMQTT_PACKETREADSTATE_FINISHED);
 		break;
 	}
 	return ret;

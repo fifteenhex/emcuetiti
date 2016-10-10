@@ -231,8 +231,7 @@ static void emcuetiti_handleinboundpacket_unsubscribe(
 		}
 	}
 
-	libmqtt_construct_unsuback(emcuetiti_client_resolvewritefunc(broker, cs),
-			userdata, messageid);
+	libmqtt_writepkt_unsuback(&cs->outgoingpacket, messageid);
 }
 
 static void emcuetiti_handleinboundpacket_disconnect(

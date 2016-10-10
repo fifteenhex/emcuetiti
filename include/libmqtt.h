@@ -238,9 +238,6 @@ int libmqtt_construct_subscribe(libmqtt_writefunc writefunc, void* userdata,
 int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t id, uint8_t* returncodes, int numreturncodes);
 
-int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata,
-		uint16_t messageid);
-
 int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 		size_t bufferlen);
 
