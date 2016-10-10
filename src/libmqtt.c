@@ -74,13 +74,6 @@ static int libmqtt_construct_genericack(libmqtt_writefunc writefunc,
 	return 0;
 }
 
-static int libmqtt_construct_fixedheaderonly(libmqtt_writefunc writefunc,
-		void* userdata, uint8_t typeandflags) {
-	uint8_t fixedheader[LIBMQTT_MINIMUMFIXEDHEADERBYTES] = { typeandflags, 0 };
-	writefunc(userdata, fixedheader, sizeof(fixedheader));
-	return 0;
-}
-
 int libmqtt_encodelength(uint8_t* buffer, size_t bufferlen, size_t len,
 		size_t* fieldlen) {
 	size_t written = 0;
@@ -94,24 +87,6 @@ int libmqtt_encodelength(uint8_t* buffer, size_t bufferlen, size_t len,
 	} while (len > 0);
 
 	*fieldlen = written;
-
-	return 0;
-}
-
-int libmqtt_decodelength(uint8_t* buffer, size_t* len) {
-	static const uint8_t continuationmask = (1 << 7);
-
-	size_t tmp = 0;
-	uint8_t byte;
-	unsigned multiplier = 1;
-
-	do {
-		byte = *(buffer++);
-		tmp += (byte & ~continuationmask) * multiplier;
-		multiplier *= 128;
-	} while ((byte & continuationmask) != 0);
-
-	*len = tmp;
 
 	return 0;
 }
@@ -368,21 +343,6 @@ int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata,
 			messageid);
 }
 
-int libmqtt_construct_pingreq(libmqtt_writefunc writefunc, void* userdata) {
-	return libmqtt_construct_fixedheaderonly(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PINGREQ, 0));
-}
-
-int libmqtt_construct_pingresp(libmqtt_writefunc writefunc, void* userdata) {
-	return libmqtt_construct_fixedheaderonly(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_PINGRESP, 0));
-}
-
-int libmqtt_construct_disconnect(libmqtt_writefunc writefunc, void* userdata) {
-	return libmqtt_construct_fixedheaderonly(writefunc, userdata,
-			LIBMQTT_PACKETYPEANDFLAGS(LIBMQTT_PACKETTYPE_DISCONNECT, 0));
-}
-
 int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 		size_t bufferlen) {
 	uint16_t strlen = (mqttstring[0] << 8) | mqttstring[1];
@@ -391,3 +351,40 @@ int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 	return 0;
 }
 
+libmqtt_packetread_state libmqtt_nextstateafterlen(uint8_t type, size_t length,
+		size_t pos) {
+	libmqtt_packetread_state nextstate = LIBMQTT_PACKETREADSTATE_ERROR;
+	switch (type) {
+	case LIBMQTT_PACKETTYPE_CONNECT:
+		nextstate = LIBMQTT_PACKETREADSTATE_CONNECT_START;
+		break;
+	case LIBMQTT_PACKETTYPE_CONNACK:
+		nextstate = LIBMQTT_PACKETREADSTATE_CONNACK_START;
+		break;
+	case LIBMQTT_PACKETTYPE_SUBSCRIBE:
+		nextstate = LIBMQTT_PACKETREADSTATE_SUBSCRIBE_START;
+		break;
+	case LIBMQTT_PACKETTYPE_SUBACK:
+		nextstate = LIBMQTT_PACKETREADSTATE_SUBACK_START;
+		break;
+	case LIBMQTT_PACKETTYPE_UNSUBSCRIBE:
+		nextstate = LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_START;
+		break;
+	case LIBMQTT_PACKETTYPE_PUBLISH:
+		nextstate = LIBMQTT_PACKETREADSTATE_PUBLISH_START;
+		break;
+	default: {
+		bool hasmessageid = (type == LIBMQTT_PACKETTYPE_PUBACK)
+				|| (type == LIBMQTT_PACKETTYPE_PUBREC)
+				|| (type == LIBMQTT_PACKETTYPE_PUBREL)
+				|| (type == LIBMQTT_PACKETTYPE_PUBCOMP)
+				|| (type == LIBMQTT_PACKETTYPE_UNSUBACK);
+		if (hasmessageid)
+			nextstate = LIBMQTT_PACKETREADSTATE_MSGID;
+		else if (length == pos)
+			nextstate = LIBMQTT_PACKETREADSTATE_FINISHED;
+	}
+		break;
+	}
+	return nextstate;
+}

@@ -7,13 +7,12 @@ import io.moquette.interception.InterceptHandler;
 import io.moquette.interception.messages.*;
 import io.moquette.server.Server;
 import io.moquette.server.config.MemoryConfig;
-import org.fusesource.mqtt.client.*;
+import org.fusesource.mqtt.client.BlockingConnection;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -145,5 +144,15 @@ public class Remote extends BaseMQTTTest {
         }
     }
 
+    @Test
+    public void keepAlive() {
+        getBoolFuture(emcuetitiConnected);
+        getBoolFuture(emcuetitiSubbed);
+        try {
+            Thread.sleep(KEEPALIVE * 4 * 1000);
+        } catch (InterruptedException ie) {
+            ie.printStackTrace();
+        }
+    }
 
 }

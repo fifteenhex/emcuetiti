@@ -244,10 +244,8 @@ static void emcuetiti_handleinboundpacket_disconnect(
 
 static void emcuetiti_handleinboundpacket_pingreq(
 		emcuetiti_brokerhandle* broker, emcuetiti_clientstate* cs) {
-	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "pingreq from %s",
-			cs->clientid);
-	libmqtt_construct_pingresp(emcuetiti_client_resolvewritefunc(broker, cs),
-			cs->client->userdata);
+	EMCUETITI_LOG_DEBUG("pingreq from %s", cs->clientid);
+	libmqtt_writepkt_pingresp(&cs->outgoingpacket);
 }
 
 static void emcuetiti_handleinboundpacket(emcuetiti_brokerhandle* broker,
@@ -294,12 +292,13 @@ int emcuetiti_client_register(emcuetiti_brokerhandle* broker,
 				emcuetiti_clientstate* cs = broker->clients + i;
 				cs->client = handle;
 				cs->state = CLIENTSTATE_NEW;
-				//cs->readstate = CLIENTREADSTATE_IDLE;
 				cs->lastseen = broker->callbacks->timestamp();
 
 				memset(cs->subscriptions, 0, sizeof(cs->subscriptions));
 				cs->numsubscriptions = 0;
 				memset(&cs->registers, 0, sizeof(cs->registers));
+
+				libmqtt_writepkt_reset(&cs->outgoingpacket);
 
 				cs->broker = broker;
 
@@ -458,6 +457,15 @@ void emcuetiti_client_poll(emcuetiti_brokerhandle* broker,
 				case CLIENTSTATE_NEW:
 				case CLIENTSTATE_CONNECTED:
 					if (isconnectedfunc(cs->client->userdata)) {
+
+						libmqtt_writepkt(&cs->outgoingpacket, NULL, NULL,
+								emcuetiti_client_resolvewritefunc(broker, cs),
+								cs->client->userdata, NULL, NULL);
+						if (cs->outgoingpacket.state
+								== LIBMQTT_PACKETREADSTATE_FINISHED) {
+							libmqtt_writepkt_reset(&cs->outgoingpacket);
+						}
+
 						if (readytoreadfunc(cs->client->userdata)) {
 							libmqtt_readpkt(&cs->incomingpacket, statechange,
 									cs,
@@ -477,6 +485,7 @@ void emcuetiti_client_poll(emcuetiti_brokerhandle* broker,
 								cs->lastseen = now;
 							}
 						}
+
 						emcuetiti_broker_poll_checkkeepalive(broker, cs, now);
 					} else
 						emcuetiti_disconnectclient(broker, cs);

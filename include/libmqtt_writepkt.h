@@ -17,6 +17,12 @@ typedef struct {
 typedef int (*libmqtt_packetwritechange)(libmqtt_packetwrite* pkt,
 		libmqtt_packetread_state previousstate, void* userdata);
 
+void libmqtt_writepkt_reset(libmqtt_packetwrite* pkt);
+
+void libmqtt_writepkt_pingreq(libmqtt_packetwrite* pkt);
+void libmqtt_writepkt_pingresp(libmqtt_packetwrite* pkt);
+void libmqtt_writepkt_disconnect(libmqtt_packetwrite* pkt);
+
 int libmqtt_writepkt(libmqtt_packetwrite* pkt, // packet being written
 		libmqtt_packetwritechange changefunc, void* changeuserdata, // packet state change callback
 		libmqtt_writefunc writefunc, void* writeuserdata, // func and data for writing the packet out

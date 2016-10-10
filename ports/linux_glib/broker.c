@@ -33,12 +33,6 @@ typedef struct {
 
 static brokerdata data;
 
-static int gsocket_write(void* userdata, const uint8_t* buffer, size_t len) {
-	GSocket* socket = (GSocket*) userdata;
-	int ret = g_socket_send(socket, buffer, len, NULL, NULL);
-	return ret;
-}
-
 static bool gsocket_isconnected(void* userdata) {
 	GSocket* socket = (GSocket*) userdata;
 	return g_socket_is_connected(socket);

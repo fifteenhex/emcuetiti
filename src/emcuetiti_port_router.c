@@ -18,8 +18,6 @@
 #include <string.h>
 
 #include "emcuetiti_port_router.h"
-#include "emcuetiti_client.h"
-#include "emcuetiti_broker.h"
 #include "emcuetiti_log.h"
 #include "buffers.h"
 

@@ -21,3 +21,4 @@
 
 bool gsocket_readytoread(void* userdata);
 int gsocket_read(void* connectiondata, uint8_t* buffer, size_t len);
+int gsocket_write(void* connectiondata, const uint8_t* buffer, size_t len);

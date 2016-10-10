@@ -25,8 +25,7 @@
 emcuetiti_topichandle* emcuetiti_findtopic(const emcuetiti_brokerhandle* broker,
 		emcuetiti_topichandle* root, const char* topicpart) {
 
-	emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "looking for %s",
-			topicpart);
+	EMCUETITI_LOG_DEBUG("looking for %s", topicpart);
 	if (root == NULL)
 		root = broker->root;
 	else

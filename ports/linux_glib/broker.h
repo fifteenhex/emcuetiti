@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "emcuetiti.h"
+#include "emcuetiti_broker.h"
 
 int broker_init(GMainLoop*, emcuetiti_brokerhandle* broker);
 void broker_cleanup();

@@ -29,3 +29,6 @@ void emcuetiti_port_onclientdisconnected(emcuetiti_brokerhandle* broker,
 void emcuetiti_port_register(emcuetiti_brokerhandle* broker,
 		emcuetiti_porthandle* port);
 
+void emcuetiti_port_poll(emcuetiti_brokerhandle* broker,
+		emcuetiti_timestamp now);
+

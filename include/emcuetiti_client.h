@@ -19,6 +19,9 @@
 #include "emcuetiti_config.h"
 #include "emcuetiti_types.h"
 
+#include "libmqtt_readpkt.h"
+#include "libmqtt_writepkt.h"
+
 typedef enum {
 	CLIENTSTATE_NEW, // client has just connected to us
 	CLIENTSTATE_CONNECTED, // client has completed MQTT handshake
@@ -67,14 +70,10 @@ struct emcuetiti_clientstate {
 
 	emcuetiti_clientconnectionstate state;
 
+#ifdef EMCUETITI_CONFIG_FULLDUPLEX
 	libmqtt_packetread incomingpacket;
-
-	uint8_t packettype;
-	size_t varheaderandpayloadlen;
-	size_t remainingbytes;
-
-	emcuetiti_topichandle* publishtopic;
-	size_t publishpayloadlen;
+	libmqtt_packetwrite outgoingpacket;
+#endif
 
 	clientregisters registers;
 	emcuetiti_brokerhandle* broker;

@@ -16,8 +16,11 @@
 
 #pragma once
 
-#include "emcuetiti_types.h"
+#include "emcuetiti_config.h"
+#include "emcuetiti_port.h"
 #include "buffers.h"
+#include "libmqtt_readpkt.h"
+#include "libmqtt_writepkt.h"
 
 #define EMCUETITI_PORT_REMOTE_OK		0
 #define EMCUETITI_PORT_REMOTE_TRYAGAIN	-1
@@ -95,6 +98,7 @@ typedef struct {
 typedef struct {
 	emcuetiti_port_remote_readystate state;
 	libmqtt_packetread pktread;
+	libmqtt_packetwrite pktwrite;
 	emcuetiti_timestamp datalastsent;
 	emcuetiti_timestamp datalastreceived;
 } emcuetiti_port_remote_statedata_ready;

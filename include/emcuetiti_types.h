@@ -21,7 +21,6 @@
 
 #include "emcuetiti_config.h"
 #include "libmqtt.h"
-#include "libmqtt_readpkt.h"
 #include "buffers_types.h"
 
 typedef EMCUETITI_CONFIG_TIMESTAMPTYPE emcuetiti_timestamp;
@@ -86,8 +85,7 @@ typedef struct {
 
 typedef struct {
 	emcuetiti_topichandle* topic;
-
-	size_t* buffsz;
+	size_t buffsz;
 	uint8_t* payloadbuff;
 } clientregisters_publish;
 

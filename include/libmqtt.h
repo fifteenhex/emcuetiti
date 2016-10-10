@@ -84,8 +84,9 @@ typedef struct {
 } libmqtt_subtransaction;
 
 typedef enum {
-	LIBMQTT_PACKETREADSTATE_TYPE,		// packet type
-	LIBMQTT_PACKETREADSTATE_LEN,		// packet remaining length
+	LIBMQTT_PACKETREADSTATE_IDLE,					// not doing anything
+	LIBMQTT_PACKETREADSTATE_TYPE,					// packet type
+	LIBMQTT_PACKETREADSTATE_LEN,					// packet remaining length
 	LIBMQTT_PACKETREADSTATE_MSGID,// packet message id, only valid for packets that need it
 	LIBMQTT_PACKETREADSTATE_COMMON_END,
 
@@ -240,12 +241,10 @@ int libmqtt_construct_suback(libmqtt_writefunc writefunc, void* userdata,
 int libmqtt_construct_unsuback(libmqtt_writefunc writefunc, void* userdata,
 		uint16_t messageid);
 
-int libmqtt_construct_pingreq(libmqtt_writefunc writefunc, void* userdata);
-
-int libmqtt_construct_pingresp(libmqtt_writefunc writefunc, void* userdata);
-
 int libmqtt_extractmqttstring(uint8_t* mqttstring, uint8_t* buffer,
 		size_t bufferlen);
 
 int libmqtt_decodelength(uint8_t* buffer, size_t* len);
 
+libmqtt_packetread_state libmqtt_nextstateafterlen(uint8_t type, size_t length,
+		size_t pos);

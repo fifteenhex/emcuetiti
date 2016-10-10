@@ -19,7 +19,8 @@
 #include <inttypes.h>
 
 #include "emcuetiti_port_remote.h"
-#include "emcuetiti.h"
+#include "emcuetiti_topic.h"
+#include "emcuetiti_log.h"
 
 #define TIMEOUT 30
 
@@ -321,8 +322,19 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 
 			data->publishwaiting = false;
 			data->publish = NULL;
+		} else {
+			libmqtt_writepkt(&data->statedata.ready.pktwrite, NULL, NULL,
+					data->config->hostops->write, data->connectiondata, NULL,
+					NULL);
+			switch (data->statedata.ready.pktwrite.state) {
+			case LIBMQTT_PACKETREADSTATE_FINISHED:
+				libmqtt_writepkt_reset(&data->statedata.ready.pktwrite);
+				break;
+			case LIBMQTT_PACKETREADSTATE_ERROR:
+				emcuetiti_port_remote_movetostate(data, REMOTEPORTSTATE_ERROR);
+				break;
+			}
 		}
-
 		break;
 	case REMOTEPORTSTATE_READY_KEEPALIVE:
 		if (data->config->keepalive > 0) {
@@ -334,8 +346,7 @@ static void emcuetiti_port_remote_state_ready(emcuetiti_timestamp now,
 			bool sendping = timesincelastsend >= data->config->keepalive
 					|| timesincelastrecv >= data->config->keepalive;
 			if (sendping) {
-				libmqtt_construct_pingreq(data->config->hostops->write,
-						data->connectiondata);
+				libmqtt_writepkt_pingreq(&data->statedata.ready.pktwrite);
 				data->statedata.ready.datalastsent = now;
 			}
 		}

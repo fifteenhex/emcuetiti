@@ -347,6 +347,11 @@ static int libmqtt_readpkt_commonstates(libmqtt_packetread* pkt, 			//
 	int ret = 0;
 
 	switch (pkt->state) {
+	case LIBMQTT_PACKETREADSTATE_IDLE: {
+		libmqtt_readpkt_changestate(pkt, changefunc,
+				LIBMQTT_PACKETREADSTATE_TYPE, changeuserdata);
+	}
+		break;
 	case LIBMQTT_PACKETREADSTATE_TYPE: {
 		uint8_t typeandflags;
 		ret = libmqtt_readpkt_read(pkt, readfunc, readuserdata, &typeandflags,
@@ -379,47 +384,9 @@ static int libmqtt_readpkt_commonstates(libmqtt_packetread* pkt, 			//
 			pkt->lenmultiplier *= 128;
 			// last byte of the length has been read
 			if (LIBMQTT_ISLASTLENBYTE(lenbyte)) {
-
-				libmqtt_packetread_state nextstate =
-						LIBMQTT_PACKETREADSTATE_ERROR;
-
-				switch (pkt->varhdr.common.type) {
-				case LIBMQTT_PACKETTYPE_CONNECT:
-					nextstate = LIBMQTT_PACKETREADSTATE_CONNECT_START;
-					break;
-				case LIBMQTT_PACKETTYPE_CONNACK:
-					nextstate = LIBMQTT_PACKETREADSTATE_CONNACK_START;
-					break;
-				case LIBMQTT_PACKETTYPE_SUBSCRIBE:
-					nextstate = LIBMQTT_PACKETREADSTATE_SUBSCRIBE_START;
-					break;
-				case LIBMQTT_PACKETTYPE_SUBACK:
-					nextstate = LIBMQTT_PACKETREADSTATE_SUBACK_START;
-					break;
-				case LIBMQTT_PACKETTYPE_UNSUBSCRIBE:
-					nextstate = LIBMQTT_PACKETREADSTATE_UNSUBSCRIBE_START;
-					break;
-				case LIBMQTT_PACKETTYPE_PUBLISH:
-					nextstate = LIBMQTT_PACKETREADSTATE_PUBLISH_START;
-				default: {
-					bool hasmessageid = (pkt->varhdr.common.type
-							== LIBMQTT_PACKETTYPE_PUBACK)
-							|| (pkt->varhdr.common.type
-									== LIBMQTT_PACKETTYPE_PUBREC)
-							|| (pkt->varhdr.common.type
-									== LIBMQTT_PACKETTYPE_PUBREL)
-							|| (pkt->varhdr.common.type
-									== LIBMQTT_PACKETTYPE_PUBCOMP)
-							|| (pkt->varhdr.common.type
-									== LIBMQTT_PACKETTYPE_UNSUBACK);
-					if (hasmessageid)
-						nextstate = LIBMQTT_PACKETREADSTATE_MSGID;
-					else if (pkt->pos == pkt->varhdr.common.length)
-						nextstate = LIBMQTT_PACKETREADSTATE_FINISHED;
-				}
-					break;
-				}
-
+				libmqtt_packetread_state nextstate = libmqtt_nextstateafterlen(
+						pkt->varhdr.common.type, pkt->varhdr.common.length,
+						pkt->pos);
 				libmqtt_readpkt_changestate(pkt, changefunc, nextstate,
 						changeuserdata);
 			}
@@ -449,7 +416,7 @@ int libmqtt_readpkt(libmqtt_packetread* pkt, 						//
 		memset(pkt, 0, sizeof(*pkt));
 
 	while (pkt->state < LIBMQTT_PACKETREADSTATE_FINISHED && ret >= 0) {
-		printf("s %d - %d %d %d\n", pkt->state, pkt->varhdr.common.type,
+		printf("pr - s %d - %d %d %d\n", pkt->state, pkt->varhdr.common.type,
 				pkt->varhdr.common.length, pkt->pos);
 
 		if (pkt->state < LIBMQTT_PACKETREADSTATE_COMMON_END)

@@ -160,7 +160,7 @@ public class BaseMQTTTest {
             Topic[] topics = new Topic[]{new Topic(topic, QoS.AT_LEAST_ONCE)};
             byte[] results = mqttConnection.subscribe(topics);
             int result = Byte.toUnsignedInt(results[0]);
-            assert result != 0x80 : "subscibe failed";
+            assert result != 0x80 : "subscribe failed";
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

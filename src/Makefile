@@ -1,15 +1,16 @@
 include ../common.mk
 
 LIBMQTTHEADERS=$(INCLUDEDIR)/libmqtt.h $(INCLUDEDIR)/libmqtt_priv.h $(INCLUDEDIR)/buffers.h
-GLOBALHEADERS=$(INCLUDEDIR)/emcuetiti_types.h $(INCLUDEDIR)/emcuetiti_config.h $(INCLUDEDIR)/emcuetiti_priv.h 
+GLOBALHEADERS=$(INCLUDEDIR)/emcuetiti_types.h $(INCLUDEDIR)/emcuetiti_config.h
 
 $(OUTPUTDIR)/libemcuetiti.a: \
 $(OUTPUTDIR)/buffers.o \
 $(OUTPUTDIR)/libmqtt.o \
 $(OUTPUTDIR)/libmqtt_readpkt.o \
 $(OUTPUTDIR)/libmqtt_writepkt.o \
-$(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_topic.o \
-$(OUTPUTDIR)/emcuetiti.o $(OUTPUTDIR)/emcuetiti_port.o \
+$(OUTPUTDIR)/emcuetiti_broker.o \
+$(OUTPUTDIR)/emcuetiti_topic.o \
+$(OUTPUTDIR)/emcuetiti_port.o \
 $(OUTPUTDIR)/emcuetiti_client.o \
 $(OUTPUTDIR)/emcuetiti_port_router.o \
 $(OUTPUTDIR)/emcuetiti_port_remote.o \
@@ -31,7 +32,7 @@ $(OUTPUTDIR)/libmqtt_readpkt.o: libmqtt_readpkt.c $(INCLUDEDIR)/libmqtt_readpkt.
 $(OUTPUTDIR)/libmqtt_writepkt.o: libmqtt_writepkt.c $(INCLUDEDIR)/libmqtt_writepkt.h $(LIBMQTTHEADERS) 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OUTPUTDIR)/emcuetiti.o: emcuetiti.c $(INCLUDEDIR)/emcuetiti.h $(GLOBALHEADERS)
+$(OUTPUTDIR)/emcuetiti_broker.o: emcuetiti_broker.c $(INCLUDEDIR)/emcuetiti_broker.h $(GLOBALHEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTPUTDIR)/emcuetiti_topic.o: emcuetiti_topic.c $(INCLUDEDIR)/emcuetiti_topic.h $(GLOBALHEADERS)

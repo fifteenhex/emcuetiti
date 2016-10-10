@@ -18,7 +18,9 @@
 
 #include <stdbool.h>
 
+// general config
 #define EMCUETITI_CONFIG_DEBUG							true
+#define EMCUETITI_CONFIG_TIMESTAMPTYPE					uint32_t
 
 // config for the broker
 #define EMCUETITI_CONFIG_MAXTOPICPARTLEN				32
@@ -34,12 +36,9 @@
 // config for clients
 #define EMCUETITI_CONFIG_MAXCLIENTS						4
 #define EMCUETITI_CONFIG_MAXSUBSPERCLIENT				4
-
 #define EMCUETITI_CONFIG_DEFAULTKEEPALIVE				600
-
 #define EMCUETITI_CONFIG_CLIENTBUFFERSZ					128
-
-#define EMCUETITI_CONFIG_TIMESTAMPTYPE					uint32_t
+#define EMCUETITI_CONFIG_FULLDUPLEX						true
 
 /*
  * These options allow you to select what callbacks a client

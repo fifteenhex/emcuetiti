@@ -19,8 +19,11 @@
 #include "libmqtt.h"
 #include "libmqtt_priv.h"
 
-#include "emcuetiti_priv.h"
-#include "emcuetiti.h"
+#include "emcuetiti_broker.h"
+#include "emcuetiti_log.h"
+#include "emcuetiti_port.h"
+#include "emcuetiti_topic.h"
+
 #include "buffers.h"
 
 #include "util.h"
@@ -48,15 +51,15 @@ void emcuetiti_broker_publish(const emcuetiti_brokerhandle* broker,
 	emcuetiti_broker_dumpstate_printtopic(broker, publish->topic);
 
 	for (int c = 0; c < ARRAY_ELEMENTS(broker->clients); c++) {
-		emcuetiti_clientstate* cs = &broker->clients[c];
+		const emcuetiti_clientstate* cs = &broker->clients[c];
 		if (cs->state == CLIENTSTATE_CONNECTED) {
 			emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG,
 					"checking client %s, has %d subscriptions", cs->clientid,
 					cs->numsubscriptions);
 			bool subbed = false;
 			for (int i = 0; i < ARRAY_ELEMENTS(cs->subscriptions); i++) {
-				emcuetiti_subscription* sub = &(cs->subscriptions[i]);
-				emcuetiti_topichandle* topic = sub->topic;
+				const emcuetiti_subscription* sub = &(cs->subscriptions[i]);
+				const emcuetiti_topichandle* topic = sub->topic;
 				if (topic != NULL) {
 
 					emcuetiti_log(broker, EMCUETITI_LOG_LEVEL_DEBUG, "topic %s",
@@ -156,7 +159,7 @@ uint8_t* emcuetiti_broker_getpayloadbuffer(const emcuetiti_brokerhandle* broker,
 		*size = *payloadbuffer.size;
 		if (!buffers_buffer_inuse(&payloadbuffer)) {
 			buffers_buffer_ref(&payloadbuffer);
-			return &broker->inflightpayloads[i];
+			return (uint8_t*) &broker->inflightpayloads[i];
 		}
 	}
 	return NULL;

@@ -14,8 +14,9 @@
  * along with emcuetiti.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "emcuetiti.h"
-#include "emcuetiti_priv.h"
+#include "emcuetiti_broker.h"
+#include "emcuetiti_client.h"
+#include "emcuetiti_port.h"
 #include "emcuetiti_log.h"
 #include "util.h"
 

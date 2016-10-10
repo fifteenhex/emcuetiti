@@ -79,17 +79,12 @@ static int remote_disconnect(void* connectiondata) {
 	return 0;
 }
 
-static int remote_write(void* connectiondata, const uint8_t* buffer, size_t len) {
-	GSocket* sock = (GSocket*) connectiondata;
-	return g_socket_send(sock, buffer, len, NULL, NULL);
-}
-
 static const emcuetiti_port_remote_hostops remotehostops = { //
 		.connect = remote_connect, //
 				.disconnect = remote_disconnect, //
 				.datawaiting = gsocket_readytoread, //
 				.read = gsocket_read, //
-				.write = remote_write };
+				.write = gsocket_write };
 
 static emcuetiti_port_remoteconfig remoteconfig = { //
 		.clientid = "remoteclient", //
